@@ -59,8 +59,8 @@ def load_and_preprocess_image(path):
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.cast(image, tf.float32)
     image /= 255.0
-#    shape = tf.shape(image)
-#    image = tf.pad(image, [[0, 450 - shape[0]], [0, 450 - shape[1]], [0, 0]])
+    shape = tf.shape(image)
+    image = tf.pad(image, [[0, 450 - shape[0]], [0, 450 - shape[1]], [0, 0]])
     
     return image
 
@@ -71,14 +71,17 @@ def CreateFDDB(root_path):
     TRAIN_LENGTH = int(0.8 * len(data['images']))
     TEST_LENGTH = len(data['images']) - TRAIN_LENGTH
     BUFFER_SIZE = 1000
-    BATCH_SIZE = 64
 
     labels = tf.data.Dataset.from_generator(lambda: data['ellipses'], tf.float32, [None, 5])
 
     images = tf.data.Dataset.from_tensor_slices(data['images'])
     images = images.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    ds = tf.data.Dataset.zip((images, labels)).shuffle(BUFFER_SIZE).prefetch(2)
+    ds = tf.data.Dataset.zip((images, labels))
+
+    # todo center data
+
+    ds = ds.shuffle(BUFFER_SIZE)
 
     train = ds.take(TRAIN_LENGTH)
     test = ds.skip(TEST_LENGTH)
@@ -86,82 +89,69 @@ def CreateFDDB(root_path):
     return (train, test)
 
 
-#import tensorflow as tf
-#from absl.flags import FLAGS
+def transform_targets(y_train, anchors, anchor_masks, size):
+    y_outs = []
+    grid_size = size // 32
 
-#@tf.function
-#def transform_targets_for_output(y_true, grid_size, anchor_idxs):
-#    # y_true: (N, boxes, (x1, y1, x2, y2, class, best_anchor))
-#    N = tf.shape(y_true)[0]
-#
-#    # y_true_out: (N, grid, grid, anchors, [x, y, w, h, obj, class])
-#    y_true_out = tf.zeros(
-#        (N, grid_size, grid_size, tf.shape(anchor_idxs)[0], 6))
-#
-#    anchor_idxs = tf.cast(anchor_idxs, tf.int32)
-#
-#    indexes = tf.TensorArray(tf.int32, 1, dynamic_size=True)
-#    updates = tf.TensorArray(tf.float32, 1, dynamic_size=True)
-#    idx = 0
-#    for i in tf.range(N):
-#        for j in tf.range(tf.shape(y_true)[1]):
-#            if tf.equal(y_true[i][j][2], 0):
-#                continue
-#            anchor_eq = tf.equal(
-#                anchor_idxs, tf.cast(y_true[i][j][5], tf.int32))
-#
-#            if tf.reduce_any(anchor_eq):
-#                box = y_true[i][j][0:4]
-#                box_xy = (y_true[i][j][0:2] + y_true[i][j][2:4]) / 2
-#
-#                anchor_idx = tf.cast(tf.where(anchor_eq), tf.int32)
-#                grid_xy = tf.cast(box_xy // (1/grid_size), tf.int32)
-#
-#                # grid[y][x][anchor] = (tx, ty, bw, bh, obj, class)
-#                indexes = indexes.write(
-#                    idx, [i, grid_xy[1], grid_xy[0], anchor_idx[0][0]])
-#                updates = updates.write(
-#                    idx, [box[0], box[1], box[2], box[3], 1, y_true[i][j][4]])
-#                idx += 1
-#
-#    # tf.print(indexes.stack())
-#    # tf.print(updates.stack())
-#
-#    return tf.tensor_scatter_nd_update(
-#        y_true_out, indexes.stack(), updates.stack())
+    # calculate anchor index for true boxes
+    anchors = tf.cast(anchors, tf.float32)
+    anchor_area = anchors[..., 0] * anchors[..., 1]
+
+    box_wh = y_train[..., 0:2]
+    box_wh = tf.tile(tf.expand_dims(box_wh, -2), (1, 1, tf.shape(anchors)[0], 1))
+    box_area = box_wh[..., 0] * box_wh[..., 1]
+
+    intersection = tf.minimum(box_wh[..., 0], anchors[..., 0]) * tf.minimum(box_wh[..., 1], anchors[..., 1])
+    iou = intersection / (box_area + anchor_area - intersection)
+
+    anchor_idx = tf.cast(tf.argmax(iou, axis=-1), tf.float32)
+    anchor_idx = tf.expand_dims(anchor_idx, axis=-1)
+
+    y_train = tf.concat([y_train, anchor_idx], axis=-1)
+
+    for anchor_idxs in anchor_masks:
+        y_outs.append(transform_targets_for_output(y_train, grid_size, anchor_idxs))
+        grid_size *= 2
+
+    return tuple(y_outs)
 
 
-#def transform_targets(y_train, anchors, anchor_masks, size):
-#    y_outs = []
-#    grid_size = size // 32
-#
-#    # calculate anchor index for true boxes
-#    anchors = tf.cast(anchors, tf.float32)
-#    anchor_area = anchors[..., 0] * anchors[..., 1]
-#    box_wh = y_train[..., 2:4] - y_train[..., 0:2]
-#    box_wh = tf.tile(tf.expand_dims(box_wh, -2),
-#                     (1, 1, tf.shape(anchors)[0], 1))
-#    box_area = box_wh[..., 0] * box_wh[..., 1]
-#    intersection = tf.minimum(box_wh[..., 0], anchors[..., 0]) * \
-#        tf.minimum(box_wh[..., 1], anchors[..., 1])
-#    iou = intersection / (box_area + anchor_area - intersection)
-#    anchor_idx = tf.cast(tf.argmax(iou, axis=-1), tf.float32)
-#    anchor_idx = tf.expand_dims(anchor_idx, axis=-1)
-#
-#    y_train = tf.concat([y_train, anchor_idx], axis=-1)
-#
-#    for anchor_idxs in anchor_masks:
-#        y_outs.append(transform_targets_for_output(
-#            y_train, grid_size, anchor_idxs))
-#        grid_size *= 2
-#
-#    return tuple(y_outs)
+@tf.function
+def transform_targets_for_output(y_true, grid_size, anchor_idxs):
+    # y_true: (N, boxes, (ax0, ax1, x, y, angle, best_anchor))
+    N = tf.shape(y_true)[0]
 
+    # y_true_out: (N, grid, grid, anchors, [x, y, w, h, angle, obj])
+    y_true_out = tf.zeros((N, grid_size, grid_size, tf.shape(anchor_idxs)[0], 6))
 
-#def transform_images(x_train, size):
-#    x_train = tf.image.resize(x_train, (size, size))
-#    x_train = x_train / 255
-#    return x_train
+    anchor_idxs = tf.cast(anchor_idxs, tf.int32)
+
+    indexes = tf.TensorArray(tf.int32, 1, dynamic_size=True)
+    updates = tf.TensorArray(tf.float32, 1, dynamic_size=True)
+    idx = 0
+    for i in tf.range(N):
+        for j in tf.range(tf.shape(y_true)[1]):
+            if tf.equal(y_true[i][j][0], 0):
+                continue
+
+            anchor_eq = tf.equal(anchor_idxs, tf.cast(y_true[i][j][5], tf.int32))
+
+            if tf.reduce_any(anchor_eq):
+                ell = y_true[i][j][0:5]
+                box_xy = y_true[i][j][3:4]
+
+                anchor_idx = tf.cast(tf.where(anchor_eq), tf.int32)
+                grid_xy = tf.cast(box_xy // (1/grid_size), tf.int32)
+
+                # grid[y][x][anchor] = (tx, ty, bw, bh, angle, obj)
+                indexes = indexes.write(idx, [i, grid_xy[1], grid_xy[0], anchor_idx[0][0]])
+                updates = updates.write(idx, [ell[3], ell[4], ell[0], ell[1], ell[2], 1])
+                idx += 1
+
+    # tf.print(indexes.stack())
+    # tf.print(updates.stack())
+
+    return tf.tensor_scatter_nd_update(y_true_out, indexes.stack(), updates.stack())
 
 
 ## https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/using_your_own_dataset.md#conversion-script-outline-conversion-script-outline

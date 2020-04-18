@@ -244,15 +244,15 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors, masks=yolo_tiny
 def YoloLoss(anchors, ignore_thresh=0.5):
     def yolo_loss(y_true, y_pred):
         # 1. transform all pred outputs
-        # y_pred: (batch_size, grid, grid, anchors, (x, y, w, h, obj, ...cls))
+        # y_pred: (batch_size, grid, grid, anchors, (x, y, w, h, angle, obj))
         pred_box, pred_obj, pred_angle, pred_xywha = yolo_boxes(y_pred, anchors)
         pred_xy = pred_xywh[..., 0:2]
         pred_wh = pred_xywh[..., 2:4]
         pred_angle =  pred_xywh[..., 4:5]
 
         # 2. transform all true outputs
-        # y_true: (batch_size, grid, grid, anchors, (x1, y1, x2, y2, obj, cls))
-        true_xy, true_wh, true_angle, true_obj = tf.split(y_true, (4, 1, 1), axis=-1)
+        # y_true: (batch_size, grid, grid, anchors, (x, y, w, h, angle, obj))
+        true_xy, true_wh, true_angle, true_obj = tf.split(y_true, (2, 2, 1, 1), axis=-1)
 
         box_x1y1 = true_xy - true_wh / 2
         box_x2y2 = true_xy + true_wh / 2

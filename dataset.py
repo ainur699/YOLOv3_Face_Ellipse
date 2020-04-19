@@ -47,8 +47,8 @@ def DrawExample(example):
     ellipses = example[1].numpy()
     
     for ell in ellipses:
-        center_coordinates = (int(ell[3]), int(ell[4]))
-        axesLength = (int(ell[0]), int(ell[1]))
+        center_coordinates = (int(FLAGS.size * ell[3]), int(FLAGS.size * ell[4]))
+        axesLength = (int(FLAGS.size * ell[0]), int(FLAGS.size * ell[1]))
         angle = int(180.0 / 3.1416 * ell[2])
         angle = angle - 90 if angle >= 0 else angle + 90 
 
@@ -70,7 +70,7 @@ def load_and_preprocess_image(path):
     return image
 
 def preprocess_label(y):
-    ratio = FLAGS.size / 450.0;
+    ratio = 1.0 / 450.0;
     ratio = [ratio, ratio, 1, ratio, ratio]
     ratio = tf.cast(ratio, tf.float32)
     y = tf.multiply(y, ratio)
@@ -134,7 +134,7 @@ def transform_targets(y_train, anchors, anchor_masks, size):
     return tuple(y_outs)
 
 
-@tf.function
+#@tf.function
 def transform_targets_for_output(y_true, grid_size, anchor_idxs):
     # y_true: (N, boxes, (ax0, ax1, x, y, angle, best_anchor))
     N = tf.shape(y_true)[0]
@@ -156,7 +156,7 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs):
 
             if tf.reduce_any(anchor_eq):
                 ell = y_true[i][j][0:5]
-                box_xy = y_true[i][j][3:4]
+                box_xy = y_true[i][j][3:5]
 
                 anchor_idx = tf.cast(tf.where(anchor_eq), tf.int32)
                 grid_xy = tf.cast(box_xy // (1/grid_size), tf.int32)
@@ -169,7 +169,7 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs):
     # tf.print(indexes.stack())
     # tf.print(updates.stack())
 
-    return tf.tensor_scatter_nd_update(y_true_out, indexes.stack(), updates.stack())
+    return tf.tensor_scatter_nd_update(y_true_out, indexes.stack(), updates.stack()) if idx > 0 else y_true_out
 
 
 ## https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/using_your_own_dataset.md#conversion-script-outline-conversion-script-outline

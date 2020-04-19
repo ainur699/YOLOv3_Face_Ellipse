@@ -55,9 +55,7 @@ def main(_argv):
   
     # Dataset
     train_dataset, val_dataset = dataset.CreateFDDB('D:/Datasets/FDDB')
-
-    ex = next(iter(train_dataset))
-    dataset.DrawExample(ex)
+    #dataset.DrawExample(next(iter(train_dataset)))
 
     train_dataset = train_dataset.batch(8)
     train_dataset = train_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))
@@ -67,9 +65,9 @@ def main(_argv):
     val_dataset = val_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))
 
 
-    # Configure the model for transfer learning
+    # transfer learning
     if FLAGS.transfer == 'none':
-        pass  # Nothing to do
+        pass
     elif FLAGS.transfer in ['darknet', 'no_output']:
         # Darknet transfer is a special case that works
         # with incompatible number of classes
@@ -104,12 +102,12 @@ def main(_argv):
             # freeze everything
             freeze_all(model)
 
+
     optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
     loss = [YoloLoss(anchors[mask]) for mask in anchor_masks]
 
+
     if FLAGS.mode == 'eager_tf':
-        # Eager mode is great for debugging
-        # Non eager graph mode is recommended for real training
         avg_loss = tf.keras.metrics.Mean('loss', dtype=tf.float32)
         avg_val_loss = tf.keras.metrics.Mean('val_loss', dtype=tf.float32)
 
@@ -152,8 +150,7 @@ def main(_argv):
         callbacks = [
             ReduceLROnPlateau(verbose=1),
             EarlyStopping(patience=3, verbose=1),
-            ModelCheckpoint('checkpoints/yolov3_train_{epoch}.tf',
-                            verbose=1, save_weights_only=True),
+            ModelCheckpoint('checkpoints/yolov3_train_{epoch}.tf', verbose=1, save_weights_only=True),
             TensorBoard(log_dir='logs')
         ]
 

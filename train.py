@@ -11,16 +11,17 @@ from tensorflow.keras.callbacks import (
     TensorBoard
 )
 from models import (
-    YoloV3, YoloV3Tiny, YoloLoss,
+    YoloV3, YoloV3Tiny, YoloV3Face, YoloLoss,
     yolo_anchors, yolo_anchor_masks,
-    yolo_tiny_anchors, yolo_tiny_anchor_masks
+    yolo_tiny_anchors, yolo_tiny_anchor_masks,
+    yolo_face_anchors, yolo_face_anchor_masks
 )
 from utils import freeze_all
 import dataset as dataset
 
 flags.DEFINE_string('dataset', '', 'path to dataset')
 flags.DEFINE_string('val_dataset', '', 'path to validation dataset')
-flags.DEFINE_boolean('tiny', False, 'yolov3 or yolov3-tiny')
+flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_string('weights', './checkpoints/yolov3-tiny.tf',
                     'path to weights file')
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
@@ -28,7 +29,7 @@ flags.DEFINE_enum('mode', 'eager_tf', ['fit', 'eager_fit', 'eager_tf'],
                   'fit: model.fit, '
                   'eager_fit: model.fit(run_eagerly=True), '
                   'eager_tf: custom GradientTape')
-flags.DEFINE_enum('transfer', 'no_output',
+flags.DEFINE_enum('transfer', 'darknet',
                   ['none', 'darknet', 'no_output', 'frozen', 'fine_tune'],
                   'none: Training from scratch, '
                   'darknet: Transfer darknet, '
@@ -49,9 +50,9 @@ def main(_argv):
     if len(physical_devices) > 0: tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
     # Model
-    model = YoloV3Tiny(FLAGS.size, training=True)
-    anchors = yolo_tiny_anchors
-    anchor_masks = yolo_tiny_anchor_masks
+    model = YoloV3Face(FLAGS.size, training=True)
+    anchors = yolo_face_anchors
+    anchor_masks = yolo_face_anchor_masks
   
     # Dataset
     train_dataset, val_dataset = dataset.CreateFDDB('D:/Datasets/FDDB')
@@ -81,8 +82,7 @@ def main(_argv):
         model_pretrained.load_weights(FLAGS.weights)
 
         if FLAGS.transfer == 'darknet':
-            model.get_layer('yolo_darknet').set_weights(
-                model_pretrained.get_layer('yolo_darknet').get_weights())
+            model.get_layer('yolo_darknet').set_weights(model_pretrained.get_layer('yolo_darknet').get_weights())
             freeze_all(model.get_layer('yolo_darknet'))
 
         elif FLAGS.transfer == 'no_output':

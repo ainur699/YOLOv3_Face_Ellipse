@@ -50,6 +50,7 @@ def DrawExample(example):
         center_coordinates = (int(ell[3]), int(ell[4]))
         axesLength = (int(ell[0]), int(ell[1]))
         angle = int(180.0 / 3.1416 * ell[2])
+        angle = angle - 90 if angle >= 0 else angle + 90 
 
         cv2.ellipse(image, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
     
@@ -72,8 +73,12 @@ def preprocess_label(y):
     ratio = FLAGS.size / 450.0;
     ratio = [ratio, ratio, 1, ratio, ratio]
     ratio = tf.cast(ratio, tf.float32)
-
     y = tf.multiply(y, ratio)
+
+    angle = y[..., 2];
+    angle = tf.where(angle > 0, angle-1.57, angle+1.57)
+    angle = tf.expand_dims(angle, axis=-1)
+    y = tf.concat([y[..., 0:2], angle, y[..., 3:5]], axis=-1)  
 
     return y;
 

@@ -35,7 +35,7 @@ flags.DEFINE_enum('transfer', 'no_output',
                   'no_output: Transfer all but output, '
                   'frozen: Transfer and freeze all, '
                   'fine_tune: Transfer all and freeze darknet only')
-flags.DEFINE_integer('size', 416, 'image size')
+flags.DEFINE_integer('size', 512, 'image size')
 flags.DEFINE_integer('epochs', 2, 'number of epochs')
 flags.DEFINE_integer('batch_size', 8, 'batch size')
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
@@ -49,19 +49,22 @@ def main(_argv):
     if len(physical_devices) > 0: tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
     # Model
-    model = YoloV3Tiny(450, training=True, classes=FLAGS.num_classes)
+    model = YoloV3Tiny(FLAGS.size, training=True)
     anchors = yolo_tiny_anchors
     anchor_masks = yolo_tiny_anchor_masks
   
     # Dataset
-    train_dataset, val_dataset = CreateFDDB("D:/Datasets/FDDB")
+    train_dataset, val_dataset = dataset.CreateFDDB('D:/Datasets/FDDB')
+
+    ex = next(iter(train_dataset))
+    dataset.DrawExample(ex)
 
     train_dataset = train_dataset.batch(8)
-    train_dataset = train_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, 450)))
+    train_dataset = train_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))
     train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     val_dataset = val_dataset.batch(8)
-    val_dataset = val_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, 450)))
+    val_dataset = val_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))
 
 
     # Configure the model for transfer learning

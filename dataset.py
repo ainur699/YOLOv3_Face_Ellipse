@@ -1,3 +1,6 @@
+from absl import app, flags, logging
+from absl.flags import FLAGS
+
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
@@ -40,7 +43,7 @@ def LoadFDDB(root_path):
 
 
 def DrawExample(example):
-    image = example[0].numpy()
+    image = 255.0 * example[0].numpy()
     ellipses = example[1].numpy()
     
     for ell in ellipses:
@@ -50,8 +53,8 @@ def DrawExample(example):
 
         cv2.ellipse(image, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
     
-    plt.figure(figsize=(10, 10))
-    plt.imshow(image)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    cv2.imwrite('debug.png', image)
 
 
 def load_and_preprocess_image(path):
@@ -61,9 +64,18 @@ def load_and_preprocess_image(path):
     image /= 255.0
     shape = tf.shape(image)
     image = tf.pad(image, [[0, 450 - shape[0]], [0, 450 - shape[1]], [0, 0]])
-    
+    image = tf.image.resize(image, (FLAGS.size, FLAGS.size))
+
     return image
 
+def preprocess_label(y):
+    ratio = FLAGS.size / 450.0;
+    ratio = [ratio, ratio, 1, ratio, ratio]
+    ratio = tf.cast(ratio, tf.float32)
+
+    y = tf.multiply(y, ratio)
+
+    return y;
 
 def CreateFDDB(root_path):
     data = LoadFDDB(root_path)
@@ -73,6 +85,7 @@ def CreateFDDB(root_path):
     BUFFER_SIZE = 1000
 
     labels = tf.data.Dataset.from_generator(lambda: data['ellipses'], tf.float32, [None, 5])
+    labels = labels.map(preprocess_label, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     images = tf.data.Dataset.from_tensor_slices(data['images'])
     images = images.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)

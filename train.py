@@ -21,14 +21,14 @@ import dataset as dataset
 flags.DEFINE_string('dataset', '', 'path to dataset')
 flags.DEFINE_string('val_dataset', '', 'path to validation dataset')
 flags.DEFINE_boolean('tiny', False, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
+flags.DEFINE_string('weights', './checkpoints/yolov3-tiny.tf',
                     'path to weights file')
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
-flags.DEFINE_enum('mode', 'fit', ['fit', 'eager_fit', 'eager_tf'],
+flags.DEFINE_enum('mode', 'eager_tf', ['fit', 'eager_fit', 'eager_tf'],
                   'fit: model.fit, '
                   'eager_fit: model.fit(run_eagerly=True), '
                   'eager_tf: custom GradientTape')
-flags.DEFINE_enum('transfer', 'none',
+flags.DEFINE_enum('transfer', 'no_output',
                   ['none', 'darknet', 'no_output', 'frozen', 'fine_tune'],
                   'none: Training from scratch, '
                   'darknet: Transfer darknet, '
@@ -46,14 +46,13 @@ flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weight
 
 def main(_argv):
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
-    if len(physical_devices) > 0:
-        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    if len(physical_devices) > 0: tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
+    # Model
     model = YoloV3Tiny(450, training=True, classes=FLAGS.num_classes)
     anchors = yolo_tiny_anchors
     anchor_masks = yolo_tiny_anchor_masks
   
-
     # Dataset
     train_dataset, val_dataset = CreateFDDB("D:/Datasets/FDDB")
 
@@ -74,11 +73,10 @@ def main(_argv):
 
         # reset top layers
         if FLAGS.tiny:
-            model_pretrained = YoloV3Tiny(
-                FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+            model_pretrained = YoloV3Tiny(FLAGS.size, training=True)
         else:
-            model_pretrained = YoloV3(
-                FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+            model_pretrained = YoloV3(FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+
         model_pretrained.load_weights(FLAGS.weights)
 
         if FLAGS.transfer == 'darknet':
@@ -92,7 +90,6 @@ def main(_argv):
                     l.set_weights(model_pretrained.get_layer(
                         l.name).get_weights())
                     freeze_all(l)
-
     else:
         # All other transfer require matching classes
         model.load_weights(FLAGS.weights)
@@ -105,8 +102,7 @@ def main(_argv):
             freeze_all(model)
 
     optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
-    loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
-            for mask in anchor_masks]
+    loss = [YoloLoss(anchors[mask]) for mask in anchor_masks]
 
     if FLAGS.mode == 'eager_tf':
         # Eager mode is great for debugging
@@ -128,9 +124,7 @@ def main(_argv):
                 optimizer.apply_gradients(
                     zip(grads, model.trainable_variables))
 
-                logging.info("{}_train_{}, {}, {}".format(
-                    epoch, batch, total_loss.numpy(),
-                    list(map(lambda x: np.sum(x.numpy()), pred_loss))))
+                logging.info("{}_train_{}, {}, {}".format(epoch, batch, total_loss.numpy(),list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                 avg_loss.update_state(total_loss)
 
             for batch, (images, labels) in enumerate(val_dataset):
@@ -141,23 +135,16 @@ def main(_argv):
                     pred_loss.append(loss_fn(label, output))
                 total_loss = tf.reduce_sum(pred_loss) + regularization_loss
 
-                logging.info("{}_val_{}, {}, {}".format(
-                    epoch, batch, total_loss.numpy(),
-                    list(map(lambda x: np.sum(x.numpy()), pred_loss))))
+                logging.info("{}_val_{}, {}, {}".format(epoch, batch, total_loss.numpy(), list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                 avg_val_loss.update_state(total_loss)
 
-            logging.info("{}, train: {}, val: {}".format(
-                epoch,
-                avg_loss.result().numpy(),
-                avg_val_loss.result().numpy()))
+            logging.info("{}, train: {}, val: {}".format(epoch, avg_loss.result().numpy(), avg_val_loss.result().numpy()))
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
-            model.save_weights(
-                'checkpoints/yolov3_train_{}.tf'.format(epoch))
+            model.save_weights('checkpoints/yolov3_tiny_train_{}.tf'.format(epoch))
     else:
-        model.compile(optimizer=optimizer, loss=loss,
-                      run_eagerly=(FLAGS.mode == 'eager_fit'))
+        model.compile(optimizer=optimizer, loss=loss, run_eagerly=(FLAGS.mode == 'eager_fit'))
 
         callbacks = [
             ReduceLROnPlateau(verbose=1),

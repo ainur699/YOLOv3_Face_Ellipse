@@ -80,6 +80,12 @@ def preprocess_label(y):
     angle = tf.expand_dims(angle, axis=-1)
     y = tf.concat([y[..., 0:2], angle, y[..., 3:5]], axis=-1)  
 
+    paddings = [[0, FLAGS.yolo_max_boxes - tf.shape(y)[0]], [0, 0]]
+    #padding = tf.zeros_like(y)
+    #padding = tf.stack([padding, padding], axis=-1)
+
+    y = tf.pad(y, paddings)
+
     return y;
 
 def CreateFDDB(root_path):
@@ -102,7 +108,7 @@ def CreateFDDB(root_path):
     ds = ds.shuffle(BUFFER_SIZE)
 
     train = ds.take(TRAIN_LENGTH)
-    test = ds.skip(TEST_LENGTH)
+    test = ds.skip(TRAIN_LENGTH)
 
     return (train, test)
 
@@ -160,6 +166,11 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs):
 
                 anchor_idx = tf.cast(tf.where(anchor_eq), tf.int32)
                 grid_xy = tf.cast(box_xy // (1/grid_size), tf.int32)
+
+                if tf.equal(grid_xy[0], grid_size): 
+                    grid_xy = tf.subtract(grid_xy, [1, 0])
+                if tf.equal(grid_xy[1], grid_size):
+                    grid_xy = tf.subtract(grid_xy, [0, 1])
 
                 # grid[y][x][anchor] = (tx, ty, bw, bh, angle, obj)
                 indexes = indexes.write(idx, [i, grid_xy[1], grid_xy[0], anchor_idx[0][0]])

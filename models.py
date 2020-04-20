@@ -287,9 +287,9 @@ def YoloLoss(anchors, ignore_thresh=0.5):
         # 1. transform all pred outputs
         # y_pred: (batch_size, grid, grid, anchors, (x, y, w, h, angle, obj))
         pred_box, pred_obj, pred_angle, pred_xywha = yolo_boxes(y_pred, anchors)
-        pred_xy = pred_xywh[..., 0:2]
-        pred_wh = pred_xywh[..., 2:4]
-        pred_angle =  pred_xywh[..., 4:5]
+        pred_xy = pred_xywha[..., 0:2]
+        pred_wh = pred_xywha[..., 2:4]
+        pred_angle =  pred_xywha[..., 4:5]
 
         # 2. transform all true outputs
         # y_true: (batch_size, grid, grid, anchors, (x, y, w, h, angle, obj))

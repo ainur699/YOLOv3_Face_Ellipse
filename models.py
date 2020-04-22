@@ -183,28 +183,42 @@ def yolo_boxes(pred, anchors):
     return bbox, objectness, angle, pred_box
 
 
-def yolo_nms(outputs, anchors, masks, classes):
+def yolo_nms(outputs, anchors, masks):
     # boxes, conf, angle
-    b, c = [], [], []
+    box, obj, ang = [], [], []
 
     for o in outputs:
-        b.append(tf.reshape(o[0], (tf.shape(o[0])[0], -1, tf.shape(o[0])[-1])))
-        c.append(tf.reshape(o[1], (tf.shape(o[1])[0], -1, tf.shape(o[1])[-1])))
+        box.append(tf.reshape(o[0], (tf.shape(o[0])[0], -1, tf.shape(o[0])[-1])))
+        obj.append(tf.reshape(o[1], (tf.shape(o[1])[0], -1, tf.shape(o[1])[-1])))
+        ang.append(tf.reshape(o[2], (tf.shape(o[2])[0], -1, tf.shape(o[2])[-1])))
 
-    bbox = tf.concat(b, axis=1)
-    confidence = tf.concat(c, axis=1)
+    bbox = tf.concat(box, axis=1)
+    angles = tf.concat(ang, axis=1)
+    confidence = tf.concat(obj, axis=1)
 
-    boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
-        boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
-        scores=tf.reshape(scores, (tf.shape(scores)[0], -1, tf.shape(scores)[-1])),
-        max_output_size_per_class=FLAGS.yolo_max_boxes,
-        max_total_size=FLAGS.yolo_max_boxes,
-        iou_threshold=FLAGS.yolo_iou_threshold,
-        score_threshold=FLAGS.yolo_score_threshold
-    )
+    box_xy = (bbox[..., 0:2] + bbox[..., 2:4]) / 2
+    box_wh = bbox[..., 2:4] - bbox[..., 0:2]
+    bbox = tf.concat([box_xy, box_wh], axis=-1)
 
-    return boxes, scores, classes, valid_detections
+    indices = tf.argsort(confidence, axis=-2, direction='DESCENDING')
 
+    confidence = tf.gather(confidence, indices, axis=1, batch_dims=1)
+    bbox = tf.gather(bbox, indices, axis=1, batch_dims=1)
+    angles = tf.gather(angles, indices, axis=1, batch_dims=1)
+
+#    valid_detections = 
+
+#    boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
+#        boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
+#        scores=tf.reshape(scores, (tf.shape(scores)[0], -1, tf.shape(scores)[-1])),
+#        max_output_size_per_class=FLAGS.yolo_max_boxes,
+#        max_total_size=FLAGS.yolo_max_boxes,
+#        iou_threshold=FLAGS.yolo_iou_threshold,
+#        score_threshold=FLAGS.yolo_score_threshold
+#    )
+#    return boxes, scores, classes, valid_detections
+
+    return bbox, angles, confidence
 
 def YoloV3(size=None, channels=3, anchors=yolo_anchors, masks=yolo_anchor_masks, classes=80, training=False):
     x = inputs = Input([size, size, channels], name='input')

@@ -58,13 +58,33 @@ def DrawExample(example):
     cv2.imwrite('debug.png', image)
 
 
+def DrawOutputs(img, outputs, name):
+    bbox, angles, confidence = outputs
+
+    xywh = FLAGS.size * bbox[0][0][0].numpy()
+
+    center_coordinates = (int(xywh[0]), int(xywh[1]))
+    axesLength = (int(xywh[2]), int(xywh[3]))
+
+    angle = angles[0][0][0][0].numpy()
+    angle = int(180.0 / 3.1416 * angle)
+    angle = angle - 90 if angle >= 0 else angle + 90 
+    
+    im = 255 * img[0].numpy()
+    im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+
+    cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
+    cv2.imwrite(name, im)
+
+
 def load_and_preprocess_image(path):
     image = tf.io.read_file(path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.cast(image, tf.float32)
     image /= 255.0
     shape = tf.shape(image)
-    image = tf.pad(image, [[0, 450 - shape[0]], [0, 450 - shape[1]], [0, 0]])
+    max_shape = tf.maximum(shape[0], shape[1])
+    image = tf.pad(image, [[0, max_shape - shape[0]], [0, max_shape - shape[1]], [0, 0]])
     image = tf.image.resize(image, (FLAGS.size, FLAGS.size))
 
     return image

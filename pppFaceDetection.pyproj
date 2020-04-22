@@ -24,8 +24,8 @@
   <ItemGroup>
     <Compile Include="batch_norm.py" />
     <Compile Include="dataset.py" />
+    <Compile Include="detect.py" />
     <Compile Include="models.py" />
-    <Compile Include="pppFaceDetection.py" />
     <Compile Include="train.py" />
     <Compile Include="utils.py" />
   </ItemGroup>

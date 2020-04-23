@@ -82,31 +82,43 @@ def load_and_preprocess_image(path):
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.cast(image, tf.float32)
     image /= 255.0
-    shape = tf.shape(image)
-    max_shape = tf.maximum(shape[0], shape[1])
-    image = tf.pad(image, [[0, max_shape - shape[0]], [0, max_shape - shape[1]], [0, 0]])
-    image = tf.image.resize(image, (FLAGS.size, FLAGS.size))
 
     return image
 
 def preprocess_label(y):
-    ratio = 1.0 / 450.0;
-    ratio = [ratio, ratio, 1, ratio, ratio]
-    ratio = tf.cast(ratio, tf.float32)
-    y = tf.multiply(y, ratio)
-
     angle = y[..., 2];
     angle = tf.where(angle > 0, angle-1.57, angle+1.57)
     angle = tf.expand_dims(angle, axis=-1)
     y = tf.concat([y[..., 0:2], angle, y[..., 3:5]], axis=-1)  
 
-    paddings = [[0, FLAGS.yolo_max_boxes - tf.shape(y)[0]], [0, 0]]
-    #padding = tf.zeros_like(y)
-    #padding = tf.stack([padding, padding], axis=-1)
+    return y;
 
+
+def pad_and_resize_data(image, y):
+    shape = tf.shape(image)
+    max_shape = tf.maximum(shape[0], shape[1])
+    t_pad = (max_shape - shape[0]) // 2
+    b_pad = max_shape - shape[0] - t_pad 
+    l_pad = (max_shape - shape[1]) // 2
+    r_pad = max_shape - shape[1] - l_pad
+
+    image = tf.pad(image, [[t_pad, b_pad], [l_pad, r_pad], [0, 0]])
+    image = tf.image.resize(image, (FLAGS.size, FLAGS.size))
+
+    
+    shift = [0, 0, 0, l_pad, t_pad]
+    y = tf.add(y, shift)
+
+    ratio = 1.0 / tf.cast(max_shape, tf.float32);
+    ratio = [ratio, ratio, 1, ratio, ratio]
+    ratio = tf.cast(ratio, tf.float32)
+    y = tf.multiply(y, ratio)
+
+    paddings = [[0, FLAGS.yolo_max_boxes - tf.shape(y)[0]], [0, 0]]
     y = tf.pad(y, paddings)
 
-    return y;
+    return (image, y)
+
 
 def CreateFDDB(root_path):
     data = LoadFDDB(root_path)
@@ -122,8 +134,7 @@ def CreateFDDB(root_path):
     images = images.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     ds = tf.data.Dataset.zip((images, labels))
-
-    # todo center data
+    ds = ds.map(pad_and_resize_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     ds = ds.shuffle(BUFFER_SIZE)
 

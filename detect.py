@@ -9,9 +9,10 @@ from models import (
 )
 import dataset
 import os
+import glob
 
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
-flags.DEFINE_string('weights', './checkpoints/yolov3_tiny_train_2.tf', 'path to weights file')
+flags.DEFINE_string('weights', './checkpoints/yolov3_face2_train_16.tf', 'path to weights file')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_integer('size', 512, 'resize images to')
 flags.DEFINE_string('image', 'D:/Images/04ed1c2ebffb11e38f8c0002c9dced72_6.jpg', 'path to input image')
@@ -28,17 +29,48 @@ def main(_argv):
     yolo.load_weights(FLAGS.weights).expect_partial()
     logging.info('weights loaded')
 
-    for filename in os.listdir('D:/Images'):
-        if filename.endswith(".jpg"):
-            img = dataset.load_and_preprocess_image('D:/Images/' + filename)
-            img = tf.expand_dims(img, 0)
+#    for filename in os.listdir('D:/Images'):
+#        if filename.endswith(".jpg"):
+#            img = dataset.load_and_preprocess_image('D:/Images/' + filename)
+#            img = tf.expand_dims(img, 0)
+#
+#            t1 = time.time()
+#            outputs = yolo(img)
+#            t2 = time.time()
+#            logging.info('time: {}'.format(t2 - t1))
+#
+#            dataset.DrawOutputs(img, outputs, './results/' + filename)
 
-            t1 = time.time()
-            outputs = yolo(img)
-            t2 = time.time()
-            logging.info('time: {}'.format(t2 - t1))
+    root_path = 'D:/Datasets/FDDB'
+    label_files = glob.glob(os.path.join(root_path, 'FDDB-folds\\FDDB-fold-*-ellipseList.txt'))
 
-            dataset.DrawOutputs(img, outputs, './results/' + filename)
+    img_num = 0
+
+    for fname in label_files:
+        if img_num > 100: break
+        with open(fname) as f:
+            raw_label = f.read().strip().split('\n')
+            
+            id = 0
+            
+            while id < len(raw_label):
+                image_name = os.path.join(root_path, 'originalPics', raw_label[id]) + '.jpg'
+                image_name = os.path.normpath(image_name)
+                ell_num = int(raw_label[id + 1])
+                id += 2
+                
+                ellipses = []
+                for i in range(ell_num):
+                    ell = tuple(map(float, raw_label[id+i].split(' ')[:-2]))
+                    ellipses.append(ell)
+                
+                id += ell_num
+                
+                img = dataset.load_and_preprocess_image(image_name)
+                img = tf.expand_dims(img, 0)
+                outputs = yolo(img)
+                img_num = 1 + img_num
+                dataset.DrawOutputs(img, outputs, './results/' + os.path.basename(image_name))
 
 
 if __name__ == '__main__':

@@ -77,24 +77,13 @@ def DrawOutputs(img, outputs, name):
     cv2.imwrite(name, im)
 
 
-def load_and_preprocess_image(path):
-    image = tf.io.read_file(path)
+def preprocess_data(x, y):
+    # image
+    image = tf.io.read_file(x)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.cast(image, tf.float32)
     image /= 255.0
 
-    return image
-
-def preprocess_label(y):
-    angle = y[..., 2];
-    angle = tf.where(angle > 0, angle-1.57, angle+1.57)
-    angle = tf.expand_dims(angle, axis=-1)
-    y = tf.concat([y[..., 0:2], angle, y[..., 3:5]], axis=-1)  
-
-    return y;
-
-
-def pad_and_resize_data(image, y):
     shape = tf.shape(image)
     max_shape = tf.maximum(shape[0], shape[1])
     t_pad = (max_shape - shape[0]) // 2
@@ -105,7 +94,12 @@ def pad_and_resize_data(image, y):
     image = tf.pad(image, [[t_pad, b_pad], [l_pad, r_pad], [0, 0]])
     image = tf.image.resize(image, (FLAGS.size, FLAGS.size))
 
-    
+    # label
+    angle = y[..., 2];
+    angle = tf.where(angle > 0, angle-1.57, angle+1.57)
+    angle = tf.expand_dims(angle, axis=-1)
+    y = tf.concat([y[..., 0:2], angle, y[..., 3:5]], axis=-1)  
+
     shift = [0, 0, 0, l_pad, t_pad]
     y = tf.add(y, shift)
 
@@ -128,13 +122,10 @@ def CreateFDDB(root_path):
     BUFFER_SIZE = 1000
 
     labels = tf.data.Dataset.from_generator(lambda: data['ellipses'], tf.float32, [None, 5])
-    labels = labels.map(preprocess_label, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
     images = tf.data.Dataset.from_tensor_slices(data['images'])
-    images = images.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     ds = tf.data.Dataset.zip((images, labels))
-    ds = ds.map(pad_and_resize_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    ds = ds.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     ds = ds.shuffle(BUFFER_SIZE)
 

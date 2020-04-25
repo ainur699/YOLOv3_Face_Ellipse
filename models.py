@@ -202,14 +202,6 @@ def yolo_nms(outputs, anchors, masks):
     box_wh = bbox[..., 2:4] - bbox[..., 0:2]
     bbox_xywh = tf.concat([box_xy, box_wh], axis=-1)
 
-   # indices = tf.argsort(confidence, axis=-2, direction='DESCENDING')
-
-   # confidence = tf.gather(confidence, indices, axis=1, batch_dims=1)
-   # bbox = tf.gather(bbox, indices, axis=1, batch_dims=1)
-   # angles = tf.gather(angles, indices, axis=1, batch_dims=1)
-
-    #valid_detections = tf.reduce_sum(tf.where(confidence > FLAGS.yolo_score_threshold, 1, 0))
-
     outputs = tf.TensorArray(tf.float32, 1, dynamic_size=True)
 
     for i in tf.range(tf.shape(bbox)[0]):
@@ -230,27 +222,8 @@ def yolo_nms(outputs, anchors, masks):
 
         outputs = outputs.write(i, out)
 
-#iou
-#    int_w = tf.maximum(tf.minimum(box_1[..., 2], box_2[..., 2]) - tf.maximum(box_1[..., 0], box_2[..., 0]), 0)
-#    int_h = tf.maximum(tf.minimum(box_1[..., 3], box_2[..., 3]) - tf.maximum(box_1[..., 1], box_2[..., 1]), 0)
-#    int_area = int_w * int_h
-#    
-#    box_1_area = (box_1[..., 2] - box_1[..., 0]) * (box_1[..., 3] - box_1[..., 1])
-#    box_2_area = (box_2[..., 2] - box_2[..., 0]) * (box_2[..., 3] - box_2[..., 1])
-#    return int_area / (box_1_area + box_2_area - int_area)
-
-
-#    boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
-#        boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
-#        scores=tf.reshape(scores, (tf.shape(scores)[0], -1, tf.shape(scores)[-1])),
-#        max_output_size_per_class=FLAGS.yolo_max_boxes,
-#        max_total_size=FLAGS.yolo_max_boxes,
-#        iou_threshold=FLAGS.yolo_iou_threshold,
-#        score_threshold=FLAGS.yolo_score_threshold
-#    )
-#    return boxes, scores, classes, valid_detections
-
     return outputs.stack()
+
 
 def YoloV3(size=None, channels=3, anchors=yolo_anchors, masks=yolo_anchor_masks, classes=80, training=False):
     x = inputs = Input([size, size, channels], name='input')

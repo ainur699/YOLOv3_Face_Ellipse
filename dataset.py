@@ -65,6 +65,8 @@ def DrawOutputs(img, outputs, name):
     ellipses = outputs.numpy()
 
     for ell in ellipses:
+        if ell[2] == 0:
+            continue
         xywh = FLAGS.size * ell[0:4]
 
         center_coordinates = (int(xywh[0]), int(xywh[1]))

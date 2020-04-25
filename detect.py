@@ -67,7 +67,7 @@ def main(_argv):
                 
                 id += ell_num
                 
-                img, _ = dataset.load_and_preprocess_image(image_name)
+                img, _, _ = dataset.load_and_preprocess_image(image_name)
                 img = tf.expand_dims(img, 0)
                 outputs = yolo(img)
                 img_num = 1 + img_num

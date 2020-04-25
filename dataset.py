@@ -97,12 +97,12 @@ def load_and_preprocess_image(path):
     image = tf.pad(image, [[t_pad, b_pad], [l_pad, r_pad], [0, 0]])
     image = tf.image.resize(image, (FLAGS.size, FLAGS.size))
 
-    return image, (l_pad, t_pad)
+    return image, (l_pad, t_pad), max_shape
 
 
 def preprocess_data(x, y):
     # image
-    image, pad = load_and_preprocess_image(x)
+    image, pad, max_shape = load_and_preprocess_image(x)
 
     # label
     angle = y[..., 2];
@@ -128,19 +128,24 @@ def CreateFDDB(root_path):
     data = LoadFDDB(root_path)
 
     TRAIN_LENGTH = int(0.8 * len(data['images']))
-    TEST_LENGTH = len(data['images']) - TRAIN_LENGTH
-    BUFFER_SIZE = 1000
 
-    labels = tf.data.Dataset.from_generator(lambda: data['ellipses'], tf.float32, [None, 5])
-    images = tf.data.Dataset.from_tensor_slices(data['images'])
+    data_train_x = data['images'][:TRAIN_LENGTH]
+    data_train_y = data['ellipses'][:TRAIN_LENGTH]
 
-    ds = tf.data.Dataset.zip((images, labels))
-    ds = ds.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    data_val_x = data['images'][TRAIN_LENGTH:]
+    data_val_y = data['ellipses'][TRAIN_LENGTH:]
 
-    ds = ds.shuffle(BUFFER_SIZE)
+    x_train = tf.data.Dataset.from_tensor_slices(data_train_x)
+    y_train = tf.data.Dataset.from_generator(lambda: data_train_y, tf.float32, [None, 5])
+    
+    x_val = tf.data.Dataset.from_tensor_slices(data_val_x)
+    y_val = tf.data.Dataset.from_generator(lambda: data_val_y, tf.float32, [None, 5])
 
-    train = ds.take(TRAIN_LENGTH)
-    test = ds.skip(TRAIN_LENGTH)
+    train = tf.data.Dataset.zip((x_train, y_train))
+    train = ds.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    test = tf.data.Dataset.zip((x_val, y_val))
+    test = ds.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     return (train, test)
 

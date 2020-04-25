@@ -22,7 +22,7 @@ import dataset
 flags.DEFINE_string('dataset', '', 'path to dataset')
 flags.DEFINE_string('val_dataset', '', 'path to validation dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('weights', './checkpoints/yolov3_face_train_20.tf',
+flags.DEFINE_string('weights', './checkpoints/yolov3_face_train_transfer_17.tf',
                     'path to weights file')
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
 flags.DEFINE_enum('mode', 'fit', ['fit', 'eager_fit', 'eager_tf'],
@@ -37,7 +37,7 @@ flags.DEFINE_enum('transfer', 'fine_tune',
                   'frozen: Transfer and freeze all, '
                   'fine_tune: Transfer all and freeze darknet only')
 flags.DEFINE_integer('size', 512, 'image size')
-flags.DEFINE_integer('epochs', 40, 'number of epochs')
+flags.DEFINE_integer('epochs', 200, 'number of epochs')
 flags.DEFINE_integer('batch_size', 8, 'batch size')
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
 flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
@@ -58,7 +58,7 @@ def main(_argv):
     train_dataset, val_dataset = dataset.CreateFDDB('D:/Datasets/FDDB')
     #dataset.DrawExample(next(iter(train_dataset)))
 
-
+    train_dataset = train_dataset.shuffle(512)
     train_dataset = train_dataset.batch(8)
     train_dataset = train_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))
     train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
@@ -76,7 +76,7 @@ def main(_argv):
 
         # reset top layers
         if FLAGS.tiny:
-            model_pretrained = YoloV3Face(FLAGS.size, training=True)
+            model_pretrained = YoloV3Tiny(FLAGS.size, training=True)
         else:
             model_pretrained = YoloV3(FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
 
@@ -144,14 +144,14 @@ def main(_argv):
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
-            model.save_weights('checkpoints/yolov3_face2_train_{}.tf'.format(epoch))
+            model.save_weights('checkpoints/yolov3_face_train_finetune_{}.tf'.format(epoch))
     else:
         model.compile(optimizer=optimizer, loss=loss, run_eagerly=(FLAGS.mode == 'eager_fit'))
 
         callbacks = [
             ReduceLROnPlateau(verbose=1),
-            EarlyStopping(patience=3, verbose=1),
-            ModelCheckpoint('checkpoints/yolov3_face2_train_{epoch}.tf', verbose=1, save_weights_only=True),
+            EarlyStopping(patience=15, verbose=1),
+            ModelCheckpoint('checkpoints/yolov3_face_train_finetune_{epoch}.tf', verbose=1, save_weights_only=True),
             TensorBoard(log_dir='logs')
         ]
 

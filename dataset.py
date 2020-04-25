@@ -39,6 +39,7 @@ def LoadFDDB(root_path):
                 
                 data.append((image_name, ellipses))
 
+    random.seed(1)
     random.shuffle(data)
 
     return data

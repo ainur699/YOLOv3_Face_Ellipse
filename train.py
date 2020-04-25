@@ -22,7 +22,7 @@ import dataset
 flags.DEFINE_string('dataset', '', 'path to dataset')
 flags.DEFINE_string('val_dataset', '', 'path to validation dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('weights', './checkpoints/yolov3_face_train_transfer_17.tf',
+flags.DEFINE_string('weights', './checkpoints/yolov3_face_train_transfer_16.tf',
                     'path to weights file')
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
 flags.DEFINE_enum('mode', 'fit', ['fit', 'eager_fit', 'eager_tf'],
@@ -37,7 +37,7 @@ flags.DEFINE_enum('transfer', 'fine_tune',
                   'frozen: Transfer and freeze all, '
                   'fine_tune: Transfer all and freeze darknet only')
 flags.DEFINE_integer('size', 512, 'image size')
-flags.DEFINE_integer('epochs', 200, 'number of epochs')
+flags.DEFINE_integer('epochs', 500, 'number of epochs')
 flags.DEFINE_integer('batch_size', 8, 'batch size')
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
 flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
@@ -153,7 +153,7 @@ def main(_argv):
         model.compile(optimizer=optimizer, loss=loss, run_eagerly=(FLAGS.mode == 'eager_fit'))
 
         callbacks = [
-            ReduceLROnPlateau(verbose=1),
+            ReduceLROnPlateau(factor=0.3, patience=6, verbose=1),
             EarlyStopping(patience=15, verbose=1),
             ModelCheckpoint('checkpoints/yolov3_face_train_finetune_{epoch}.tf', verbose=1, save_weights_only=True),
             TensorBoard(log_dir='logs')

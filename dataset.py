@@ -7,16 +7,16 @@ import tensorflow_datasets as tfds
 import matplotlib.pyplot as plt
 import cv2
 
+import numpy as np
 import glob
 import os
+import random
 
 
 def LoadFDDB(root_path):
     label_files = glob.glob(os.path.join(root_path, 'FDDB-folds\\FDDB-fold-*-ellipseList.txt'))
 
-    data = {}
-    data['images'] = []
-    data['ellipses'] = []
+    data = []
 
     for fname in label_files:
         with open(fname) as f:
@@ -37,8 +37,10 @@ def LoadFDDB(root_path):
                 
                 id += ell_num
                 
-                data['images'].append(image_name)
-                data['ellipses'].append(ellipses)
+                data.append((image_name, ellipses))
+
+    random.shuffle(data)
+
     return data
 
 
@@ -126,14 +128,18 @@ def preprocess_data(x, y):
 
 def CreateFDDB(root_path):
     data = LoadFDDB(root_path)
+    
+    train_size = int(0.8 * len(data))
+    
+    data = np.array(data)
+    data_train = data[:train_size]
+    data_val = data[train_size:]
 
-    TRAIN_LENGTH = int(0.8 * len(data['images']))
+    data_train_x = data_train[:, 0]
+    data_train_y = data_train[:, 1]
 
-    data_train_x = data['images'][:TRAIN_LENGTH]
-    data_train_y = data['ellipses'][:TRAIN_LENGTH]
-
-    data_val_x = data['images'][TRAIN_LENGTH:]
-    data_val_y = data['ellipses'][TRAIN_LENGTH:]
+    data_val_x = data_val[:, 0]
+    data_val_y = data_val[:, 1]
 
     x_train = tf.data.Dataset.from_tensor_slices(data_train_x)
     y_train = tf.data.Dataset.from_generator(lambda: data_train_y, tf.float32, [None, 5])
@@ -142,10 +148,10 @@ def CreateFDDB(root_path):
     y_val = tf.data.Dataset.from_generator(lambda: data_val_y, tf.float32, [None, 5])
 
     train = tf.data.Dataset.zip((x_train, y_train))
-    train = ds.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    train = train.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     test = tf.data.Dataset.zip((x_val, y_val))
-    test = ds.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    test = test.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     return (train, test)
 

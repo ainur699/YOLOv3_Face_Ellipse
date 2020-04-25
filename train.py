@@ -56,8 +56,12 @@ def main(_argv):
   
     # Dataset
     train_dataset, val_dataset = dataset.CreateFDDB('D:/Datasets/FDDB')
-    #dataset.DrawExample(next(iter(train_dataset)))
-
+    #data_iter = iter(train_dataset)
+    #dataset.DrawExample(next(data_iter))
+    #dataset.DrawExample(next(data_iter))
+    #dataset.DrawExample(next(data_iter))
+    #dataset.DrawExample(next(data_iter))
+    
     train_dataset = train_dataset.shuffle(512)
     train_dataset = train_dataset.batch(8)
     train_dataset = train_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))

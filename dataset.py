@@ -59,27 +59,28 @@ def DrawExample(example):
 
 
 def DrawOutputs(img, outputs, name):
-    bbox, angles, confidence = outputs
-
-    xywh = FLAGS.size * bbox[0][0][0].numpy()
-
-    center_coordinates = (int(xywh[0]), int(xywh[1]))
-    axesLength = (int(xywh[2]), int(xywh[3]))
-
-    angle = angles[0][0][0][0].numpy()
-    angle = int(180.0 / 3.1416 * angle)
-    angle = angle - 90 if angle >= 0 else angle + 90 
-    
-    im = 255 * img[0].numpy()
+    im = 255 * img.numpy()
     im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
 
-    cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
+    ellipses = outputs.numpy()
+
+    for ell in ellipses:
+        xywh = FLAGS.size * ell[0:4]
+
+        center_coordinates = (int(xywh[0]), int(xywh[1]))
+        axesLength = (int(xywh[2]), int(xywh[3]))
+
+        angle = ell[4]
+        angle = int(180.0 / 3.1416 * angle)
+        angle = angle - 90 if angle >= 0 else angle + 90 
+
+        cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
+    
     cv2.imwrite(name, im)
 
 
-def preprocess_data(x, y):
-    # image
-    image = tf.io.read_file(x)
+def load_and_preprocess_image(path):
+    image = tf.io.read_file(path)
     image = tf.image.decode_jpeg(image, channels=3)
     image = tf.cast(image, tf.float32)
     image /= 255.0
@@ -94,13 +95,20 @@ def preprocess_data(x, y):
     image = tf.pad(image, [[t_pad, b_pad], [l_pad, r_pad], [0, 0]])
     image = tf.image.resize(image, (FLAGS.size, FLAGS.size))
 
+    return image, (l_pad, t_pad)
+
+
+def preprocess_data(x, y):
+    # image
+    image, pad = load_and_preprocess_image(x)
+
     # label
     angle = y[..., 2];
     angle = tf.where(angle > 0, angle-1.57, angle+1.57)
     angle = tf.expand_dims(angle, axis=-1)
     y = tf.concat([y[..., 0:2], angle, y[..., 3:5]], axis=-1)  
 
-    shift = [0, 0, 0, l_pad, t_pad]
+    shift = [0, 0, 0, pad[0], pad[1]]
     y = tf.add(y, shift)
 
     ratio = 1.0 / tf.cast(max_shape, tf.float32);

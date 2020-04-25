@@ -1,3 +1,6 @@
 .ipynb_checkpoints/
 .vs/
 __pycache__/
+/checkpoints
+/results
+/logs

@@ -25,9 +25,9 @@ from tensorflow.keras.losses import (
 from batch_norm import BatchNormalization
 from utils import broadcast_iou
 
-flags.DEFINE_integer('yolo_max_boxes', 100, 'maximum number of boxes per image')
-flags.DEFINE_float('FLAGS.yolo_iou_threshold', 0.5, 'iou threshold')
-flags.DEFINE_float('FLAGS.yolo_score_threshold', 0.5, 'score threshold')
+flags.DEFINE_integer('yolo_max_boxes', 10, 'maximum number of boxes per image')
+flags.DEFINE_float('yolo_iou_threshold', 0.5, 'iou threshold')
+flags.DEFINE_float('yolo_score_threshold', 0.5, 'score threshold')
 
 
 yolo_anchors = np.array([(10, 13), (16, 30), (33, 23), (30, 61), (62, 45), (59, 119), (116, 90), (156, 198), (373, 326)], np.float32) / 416
@@ -183,6 +183,7 @@ def yolo_boxes(pred, anchors):
     return bbox, objectness, angle, pred_box
 
 
+@tf.function
 def yolo_nms(outputs, anchors, masks):
     # boxes, conf, angle
     box, obj, ang = [], [], []
@@ -195,18 +196,49 @@ def yolo_nms(outputs, anchors, masks):
     bbox = tf.concat(box, axis=1)
     angles = tf.concat(ang, axis=1)
     confidence = tf.concat(obj, axis=1)
+    score = tf.reshape(confidence, (tf.shape(confidence)[0], -1))
 
     box_xy = (bbox[..., 0:2] + bbox[..., 2:4]) / 2
     box_wh = bbox[..., 2:4] - bbox[..., 0:2]
-    bbox = tf.concat([box_xy, box_wh], axis=-1)
+    bbox_xywh = tf.concat([box_xy, box_wh], axis=-1)
 
-    indices = tf.argsort(confidence, axis=-2, direction='DESCENDING')
+   # indices = tf.argsort(confidence, axis=-2, direction='DESCENDING')
 
-    confidence = tf.gather(confidence, indices, axis=1, batch_dims=1)
-    bbox = tf.gather(bbox, indices, axis=1, batch_dims=1)
-    angles = tf.gather(angles, indices, axis=1, batch_dims=1)
+   # confidence = tf.gather(confidence, indices, axis=1, batch_dims=1)
+   # bbox = tf.gather(bbox, indices, axis=1, batch_dims=1)
+   # angles = tf.gather(angles, indices, axis=1, batch_dims=1)
 
-#    valid_detections = 
+    #valid_detections = tf.reduce_sum(tf.where(confidence > FLAGS.yolo_score_threshold, 1, 0))
+
+    outputs = tf.TensorArray(tf.float32, 1, dynamic_size=True)
+
+    for i in tf.range(tf.shape(bbox)[0]):
+        selected_indices = tf.image.non_max_suppression(
+            boxes = bbox[i],
+            scores = score[i],
+            max_output_size = FLAGS.yolo_max_boxes,
+            iou_threshold = FLAGS.yolo_iou_threshold,
+            score_threshold = FLAGS.yolo_score_threshold)
+
+        selected_boxes = tf.gather(bbox_xywh[i], selected_indices)
+        selected_angles = tf.gather(angles[i], selected_indices)
+        selected_scores = tf.gather(confidence[i], selected_indices)
+
+        out = tf.concat([selected_boxes, selected_angles, selected_scores], axis=-1)
+        paddings = [[0, FLAGS.yolo_max_boxes - tf.shape(out)[0]], [0, 0]]
+        out = tf.pad(out, paddings)
+
+        outputs = outputs.write(i, out)
+
+#iou
+#    int_w = tf.maximum(tf.minimum(box_1[..., 2], box_2[..., 2]) - tf.maximum(box_1[..., 0], box_2[..., 0]), 0)
+#    int_h = tf.maximum(tf.minimum(box_1[..., 3], box_2[..., 3]) - tf.maximum(box_1[..., 1], box_2[..., 1]), 0)
+#    int_area = int_w * int_h
+#    
+#    box_1_area = (box_1[..., 2] - box_1[..., 0]) * (box_1[..., 3] - box_1[..., 1])
+#    box_2_area = (box_2[..., 2] - box_2[..., 0]) * (box_2[..., 3] - box_2[..., 1])
+#    return int_area / (box_1_area + box_2_area - int_area)
+
 
 #    boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
 #        boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
@@ -218,7 +250,7 @@ def yolo_nms(outputs, anchors, masks):
 #    )
 #    return boxes, scores, classes, valid_detections
 
-    return bbox, angles, confidence
+    return outputs.stack()
 
 def YoloV3(size=None, channels=3, anchors=yolo_anchors, masks=yolo_anchor_masks, classes=80, training=False):
     x = inputs = Input([size, size, channels], name='input')

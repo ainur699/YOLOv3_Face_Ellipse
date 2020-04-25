@@ -25,6 +25,7 @@ def main(_argv):
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0: tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
+
     yolo = YoloV3Face(FLAGS.size)
     yolo.load_weights(FLAGS.weights).expect_partial()
     logging.info('weights loaded')
@@ -66,11 +67,11 @@ def main(_argv):
                 
                 id += ell_num
                 
-                img = dataset.load_and_preprocess_image(image_name)
+                img, _ = dataset.load_and_preprocess_image(image_name)
                 img = tf.expand_dims(img, 0)
                 outputs = yolo(img)
                 img_num = 1 + img_num
-                dataset.DrawOutputs(img, outputs, './results/' + os.path.basename(image_name))
+                dataset.DrawOutputs(img[0], outputs[0], './results/' + os.path.basename(image_name))
 
 
 if __name__ == '__main__':

@@ -31,7 +31,7 @@ def main(_argv):
     logging.info('weights loaded')
 
     if 1:
-        image_dir = 'D:/images_for_detector/'
+        image_dir = 'D:/Images/'
 
         for filename in os.listdir(image_dir):
             if filename.endswith(".jpg"):

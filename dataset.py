@@ -2,42 +2,38 @@ from absl import app, flags, logging
 from absl.flags import FLAGS
 
 import tensorflow as tf
-import tensorflow_datasets as tfds
 
 import matplotlib.pyplot as plt
 import cv2
 
 import numpy as np
-import glob
 import os
 import random
 
 
-def LoadFDDB(root_path):
-    label_files = glob.glob(os.path.join(root_path, 'FDDB-folds\\FDDB-fold-*-ellipseList.txt'))
-
+def LoadFDDB(label_file, images_rot):
     data = []
 
-    for fname in label_files:
-        with open(fname) as f:
-            raw_label = f.read().strip().split('\n')
+    with open(label_file) as f:
+        raw_label = f.read().strip().split('\n')
+        
+        id = 0
+        
+        while id < len(raw_label):
+            image_name = os.path.join(images_rot, raw_label[id])
+            image_name = os.path.normpath(image_name)
+            ell_num = int(raw_label[id + 1])
+            id += 2
             
-            id = 0
+            ellipses = []
+            for i in range(ell_num):
+                ell = tuple(map(float, raw_label[id+i].split(' ')))
+                ell_norm = (ell[2], ell[3], ell[4], ell[0], ell[1])
+                ellipses.append(ell_norm)
             
-            while id < len(raw_label):
-                image_name = os.path.join(root_path, 'originalPics', raw_label[id]) + '.jpg'
-                image_name = os.path.normpath(image_name)
-                ell_num = int(raw_label[id + 1])
-                id += 2
-                
-                ellipses = []
-                for i in range(ell_num):
-                    ell = tuple(map(float, raw_label[id+i].split(' ')[:-2]))
-                    ellipses.append(ell)
-                
-                id += ell_num
-                
-                data.append((image_name, ellipses))
+            id += ell_num
+            
+            data.append((image_name, ellipses))
 
     random.seed(1)
     random.shuffle(data)
@@ -45,48 +41,9 @@ def LoadFDDB(root_path):
     return data
 
 
-def DrawExample(example):
-    image = 255.0 * example[0].numpy()
-    ellipses = example[1].numpy()
-    
-    for ell in ellipses:
-        center_coordinates = (int(FLAGS.size * ell[3]), int(FLAGS.size * ell[4]))
-        axesLength = (int(FLAGS.size * ell[0]), int(FLAGS.size * ell[1]))
-        angle = int(180.0 / 3.1416 * ell[2])
-        angle = angle - 90 if angle >= 0 else angle + 90 
-
-        cv2.ellipse(image, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
-    
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    cv2.imwrite('debug.png', image)
-
-
-def DrawOutputs(img, outputs, name):
-    im = 255 * img.numpy()
-    im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
-
-    ellipses = outputs.numpy()
-
-    for ell in ellipses:
-        if ell[2] == 0:
-            continue
-        xywh = FLAGS.size * ell[0:4]
-
-        center_coordinates = (int(xywh[0]), int(xywh[1]))
-        axesLength = (int(xywh[2]), int(xywh[3]))
-
-        angle = ell[4]
-        angle = int(180.0 / 3.1416 * angle)
-        angle = angle - 90 if angle >= 0 else angle + 90 
-
-        cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
-    
-    cv2.imwrite(name, im)
-
-
 def load_and_preprocess_image(path):
     image = tf.io.read_file(path)
-    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.decode_image(image, channels=3)
     image = tf.cast(image, tf.float32)
     image /= 255.0
 
@@ -108,11 +65,6 @@ def preprocess_data(x, y):
     image, pad, max_shape = load_and_preprocess_image(x)
 
     # label
-    angle = y[..., 2];
-    angle = tf.where(angle > 0, angle-1.57, angle+1.57)
-    angle = tf.expand_dims(angle, axis=-1)
-    y = tf.concat([y[..., 0:2], angle, y[..., 3:5]], axis=-1)  
-
     shift = [0, 0, 0, pad[0], pad[1]]
     y = tf.add(y, shift)
 
@@ -127,34 +79,23 @@ def preprocess_data(x, y):
     return (image, y)
 
 
-def CreateFDDB(root_path):
-    data = LoadFDDB(root_path)
-    
-    train_size = int(0.8 * len(data))
-    
+def CreateFDDB(datasets, is_train):
+    data = []
+    for data_path in datasets:
+        d = LoadFDDB(data_path[0], data_path[1])
+        data = data + d
+
     data = np.array(data)
-    data_train = data[:train_size]
-    data_val = data[train_size:]
+    data_x = data[:, 0]
+    data_y = data[:, 1]
 
-    data_train_x = data_train[:, 0]
-    data_train_y = data_train[:, 1]
+    x = tf.data.Dataset.from_tensor_slices(data_x)
+    y = tf.data.Dataset.from_generator(lambda: data_y, tf.float32, [None, 5])
+   
+    dataset = tf.data.Dataset.zip((x, y))
+    dataset = dataset.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    data_val_x = data_val[:, 0]
-    data_val_y = data_val[:, 1]
-
-    x_train = tf.data.Dataset.from_tensor_slices(data_train_x)
-    y_train = tf.data.Dataset.from_generator(lambda: data_train_y, tf.float32, [None, 5])
-    
-    x_val = tf.data.Dataset.from_tensor_slices(data_val_x)
-    y_val = tf.data.Dataset.from_generator(lambda: data_val_y, tf.float32, [None, 5])
-
-    train = tf.data.Dataset.zip((x_train, y_train))
-    train = train.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    test = tf.data.Dataset.zip((x_val, y_val))
-    test = test.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-    return (train, test)
+    return dataset
 
 
 def transform_targets(y_train, anchors, anchor_masks, size):
@@ -225,6 +166,43 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs):
     # tf.print(updates.stack())
 
     return tf.tensor_scatter_nd_update(y_true_out, indexes.stack(), updates.stack()) if idx > 0 else y_true_out
+
+
+def DrawExample(example):
+    image = 255.0 * example[0].numpy()
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+    for ell in example[1].numpy():
+        center_coordinates = (int(FLAGS.size * ell[3]), int(FLAGS.size * ell[4]))
+        axesLength = (int(FLAGS.size * ell[0]), int(FLAGS.size * ell[1]))
+        angle = int(180.0 / 3.1416 * ell[2])
+
+        cv2.ellipse(image, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
+ 
+    cv2.imwrite('debug.png', image)
+
+
+def DrawOutputs(img, outputs, name):
+    im = 255 * img.numpy()
+    im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
+
+    ellipses = outputs.numpy()
+
+    for ell in ellipses:
+        if ell[2] == 0:
+            continue
+        xywh = FLAGS.size * ell[0:4]
+
+        center_coordinates = (int(xywh[0]), int(xywh[1]))
+        axesLength = (int(xywh[2]), int(xywh[3]))
+
+        angle = ell[4]
+        angle = int(180.0 / 3.1416 * angle)
+        angle = angle - 90 if angle >= 0 else angle + 90 
+
+        cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
+    
+    cv2.imwrite(name, im)
 
 
 ## https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/using_your_own_dataset.md#conversion-script-outline-conversion-script-outline

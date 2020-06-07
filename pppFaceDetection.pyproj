@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>9ce2d1fa-4381-4c86-9b8f-6148b9276398</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>detect.py</StartupFile>
+    <StartupFile>train.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>

@@ -36,8 +36,9 @@ yolo_anchor_masks = np.array([[6, 7, 8], [3, 4, 5], [0, 1, 2]])
 yolo_tiny_anchors = np.array([(10, 14), (23, 27), (37, 58), (81, 82), (135, 169),  (344, 319)], np.float32) / 416
 yolo_tiny_anchor_masks = np.array([[3, 4, 5], [0, 1, 2]])
 
-yolo_face_anchors = np.array([(53, 35), (120, 80)], np.float32) / 450
+yolo_face_anchors = np.array([(0.33, 0.5), (0.5, 0.75)], np.float32)
 yolo_face_anchor_masks = np.array([[1], [0]])
+
 
 def DarknetConv(x, filters, size, strides=1, batch_norm=True):
     if strides == 1:

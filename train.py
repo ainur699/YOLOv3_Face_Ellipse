@@ -55,12 +55,14 @@ def main(_argv):
     anchor_masks = yolo_face_anchor_masks
   
     # Dataset
-    train_dataset, val_dataset = dataset.CreateFDDB('D:/Datasets/FDDB')
-    #data_iter = iter(train_dataset)
-    #dataset.DrawExample(next(data_iter))
-    #dataset.DrawExample(next(data_iter))
-    #dataset.DrawExample(next(data_iter))
-    #dataset.DrawExample(next(data_iter))
+    train_dataset = dataset.CreateFDDB([('dataset/300w/300w_train.txt', 'dataset/300w/images')], True) #, ('dataset/fddb/FDDB_train.txt', 'dataset/fddb/images')
+    #val_dataset   = dataset.CreateFDDB([('dataset/300w/300w_valid.txt','dataset/300w/images')], False)
+    
+    data_iter = iter(train_dataset)
+    dataset.DrawExample(next(data_iter))
+    dataset.DrawExample(next(data_iter))
+    dataset.DrawExample(next(data_iter))
+    dataset.DrawExample(next(data_iter))
     
     train_dataset = train_dataset.shuffle(512)
     train_dataset = train_dataset.batch(8)

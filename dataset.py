@@ -79,7 +79,40 @@ def preprocess_data(x, y):
     return (image, y)
 
 
-def CreateFDDB(datasets, is_train):
+def crop_rotate_flip(img, ellipses, scale_factor, rot_factor, flip):
+    scale = random.uniform(1 - scale_factor, 1 + scale_factor)
+    r     = random.uniform(-rot_factor, rot_factor) if random.random() <= 0.6 else 0
+    
+    if flip and random.random() <= 0.5:
+        img = np.fliplr(img)
+        for ell in ellipses:
+            ell[3] = 1 - ell[3]
+            ell[2] = -ell[2]
+    
+    trf = cv2.getRotationMatrix2D((FLAGS.size / 2, FLAGS.size / 2), r, scale)
+    img = cv2.warpAffine(img, trf, (FLAGS.size, FLAGS.size))
+
+    for ell in ellipses:
+        if ell[0] == 0:
+            break
+        
+        center = (int(FLAGS.size * ell[3]), int(FLAGS.size * ell[4]))
+        center = np.array([[center]])
+        center = cv2.transform(center, trf)
+        
+        ell[0] = scale * ell[0]
+        ell[1] = scale * ell[1]
+        ell[2] = ell[2] - np.pi / 180.0 * r
+        ell[3] = center[0][0][0] / FLAGS.size
+        ell[4] = center[0][0][1] / FLAGS.size
+
+        if ell[3] < 0 or ell[3] > 1 or ell[4] < 0 or ell[4] > 1:
+            ell[0] = ell[1] = 0
+
+    return img, ellipses
+
+
+def CreateFDDB(datasets, is_train, scale_factor=0.25, rot_factor = 30.0, flip=True):
     data = []
     for data_path in datasets:
         d = LoadFDDB(data_path[0], data_path[1])
@@ -94,6 +127,14 @@ def CreateFDDB(datasets, is_train):
    
     dataset = tf.data.Dataset.zip((x, y))
     dataset = dataset.map(preprocess_data, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    if is_train:
+        numpy_fun = lambda x, y : crop_rotate_flip(x, y, scale_factor, rot_factor, flip)
+
+        def tf_func(x, y):
+            return tf.numpy_function(numpy_fun, [x, y], (tf.float32, tf.float32))
+
+        dataset = dataset.map(tf_func, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     return dataset
 
@@ -168,7 +209,7 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs):
     return tf.tensor_scatter_nd_update(y_true_out, indexes.stack(), updates.stack()) if idx > 0 else y_true_out
 
 
-def DrawExample(example):
+def DrawExample(example, name):
     image = 255.0 * example[0].numpy()
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
@@ -179,7 +220,7 @@ def DrawExample(example):
 
         cv2.ellipse(image, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
  
-    cv2.imwrite('debug.png', image)
+    cv2.imwrite(name, image)
 
 
 def DrawOutputs(img, outputs, name):

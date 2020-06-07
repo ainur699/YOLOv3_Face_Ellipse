@@ -21,28 +21,31 @@ import dataset
 
 flags.DEFINE_string('dataset', '', 'path to dataset')
 flags.DEFINE_string('val_dataset', '', 'path to validation dataset')
+flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
+flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
+flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weights` file if different, '
+                     'useful in transfer learning with different number of classes')
+
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_string('weights', './checkpoints/yolov3_face_train_transfer_16.tf',
                     'path to weights file')
-flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
-flags.DEFINE_enum('mode', 'fit', ['eager_tf', 'eager_fit', 'eager_tf'],
+flags.DEFINE_enum('mode', 'eager_tf', ['fit', 'eager_fit', 'eager_tf'],
                   'fit: model.fit, '
                   'eager_fit: model.fit(run_eagerly=True), '
                   'eager_tf: custom GradientTape')
-flags.DEFINE_enum('transfer', 'fine_tune',
-                  ['none', 'darknet', 'no_output', 'frozen', 'fine_tune'],
+flags.DEFINE_enum('transfer', 'darknet',
+                  ['none', 'darknet', 'no_output', 'frozen', 'fine_tune', 'resume'],
                   'none: Training from scratch, '
                   'darknet: Transfer darknet, '
                   'no_output: Transfer all but output, '
                   'frozen: Transfer and freeze all, '
-                  'fine_tune: Transfer all and freeze darknet only')
+                  'fine_tune: Transfer all and freeze darknet only, '
+                  'resume: Continue from the last point')
 flags.DEFINE_integer('size', 512, 'image size')
 flags.DEFINE_integer('epochs', 500, 'number of epochs')
 flags.DEFINE_integer('batch_size', 8, 'batch size')
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
-flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
-flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weights` file if different, '
-                     'useful in transfer learning with different number of classes')
+
 
 
 def main(_argv):
@@ -95,24 +98,28 @@ def main(_argv):
                     l.set_weights(model_pretrained.get_layer(
                         l.name).get_weights())
                     freeze_all(l)
-    else:
+    elif FLAGS.transfer in ['fine_tune', 'frozen']:
         # All other transfer require matching classes
         model.load_weights(FLAGS.weights)
         if FLAGS.transfer == 'fine_tune':
             # freeze darknet and fine tune other layers
             darknet = model.get_layer('yolo_darknet')
-            #freeze_all(darknet)
+            freeze_all(darknet)
         elif FLAGS.transfer == 'frozen':
             # freeze everything
             freeze_all(model)
+    else:
+        # resume
+        model = tf.keras.models.load_model('./checkpoints/latest')
+
 
 
     optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
     loss = [YoloLoss(anchors[mask]) for mask in anchor_masks]
-
+    best_valid_loss = float('inf')
 
     if FLAGS.mode == 'eager_tf':
-        avg_loss = tf.keras.metrics.Mean('loss', dtype=tf.float32)
+        avg_loss     = tf.keras.metrics.Mean('loss', dtype=tf.float32)
         avg_val_loss = tf.keras.metrics.Mean('val_loss', dtype=tf.float32)
 
         for epoch in range(1, FLAGS.epochs + 1):
@@ -126,8 +133,7 @@ def main(_argv):
                     total_loss = tf.reduce_sum(pred_loss) + regularization_loss
 
                 grads = tape.gradient(total_loss, model.trainable_variables)
-                optimizer.apply_gradients(
-                    zip(grads, model.trainable_variables))
+                optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
                 logging.info("{}_train_{}, {}, {}".format(epoch, batch, total_loss.numpy(),list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                 avg_loss.update_state(total_loss)
@@ -143,11 +149,21 @@ def main(_argv):
                 logging.info("{}_val_{}, {}, {}".format(epoch, batch, total_loss.numpy(), list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                 avg_val_loss.update_state(total_loss)
 
+            is_best = avg_val_loss.result().numpy() < best_valid_loss
+            best_valid_loss = min(avg_val_loss.result().numpy(), best_valid_loss)
+
+            logging.info("best: {}".format(is_best))
             logging.info("{}, train: {}, val: {}".format(epoch, avg_loss.result().numpy(), avg_val_loss.result().numpy()))
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
             model.save_weights('checkpoints/yolov3_face_train_finetune_{}.tf'.format(epoch))
+            model.save('checkpoints/latest')
+
+            if is_best:
+                model.save_weights('checkpoints/model_best.tf')
+
+
     else:
         model.compile(optimizer=optimizer, loss=loss, run_eagerly=(FLAGS.mode == 'eager_fit'))
 

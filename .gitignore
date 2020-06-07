@@ -4,3 +4,5 @@ __pycache__/
 /checkpoints
 /results
 /logs
+/dataset/300w/images/
+/dataset/fddb/images/

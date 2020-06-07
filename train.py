@@ -25,7 +25,7 @@ flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_string('weights', './checkpoints/yolov3_face_train_transfer_16.tf',
                     'path to weights file')
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
-flags.DEFINE_enum('mode', 'fit', ['fit', 'eager_fit', 'eager_tf'],
+flags.DEFINE_enum('mode', 'fit', ['eager_tf', 'eager_fit', 'eager_tf'],
                   'fit: model.fit, '
                   'eager_fit: model.fit(run_eagerly=True), '
                   'eager_tf: custom GradientTape')
@@ -58,8 +58,8 @@ def main(_argv):
     train_dataset = dataset.CreateFDDB([('dataset/fddb/FDDB_train.txt', 'dataset/fddb/images'), ('dataset/300w/300w_train.txt', 'dataset/300w/images')], True) 
     val_dataset   = dataset.CreateFDDB([('dataset/300w/300w_valid.txt','dataset/300w/images')], False)
     
-    for i, data in enumerate(train_dataset.take(10)):
-        dataset.DrawExample(data, 'log_' + str(i) + '.png')
+    #for i, data in enumerate(train_dataset.take(10)):
+    #    dataset.DrawExample(data, 'log_' + str(i) + '.png')
 
     train_dataset = train_dataset.shuffle(512)
     train_dataset = train_dataset.batch(8)

@@ -112,7 +112,10 @@ def main(_argv):
             freeze_all(model)
     else:
         # resume
-        model = tf.keras.models.load_model('./checkpoints/latest')
+        model.load_weights('checkpoints/latest.tf')
+
+    model.save_weights('checkpoints/latest.tf')
+
 
     lr = 0.001
     step_patient = 0
@@ -148,9 +151,10 @@ def main(_argv):
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
                 avg_loss.update_state(total_loss)
-                if batch % 10 == 0:
+                if batch % 20 == 0:
                     logging.info("{}_train_{}, {}, {}".format(epoch, batch, total_loss.numpy(),list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                     tf.summary.scalar('loss', data=total_loss, step=loss_step)
+                    tf.summary.flush()
                     loss_step = loss_step + 1
 
             for batch, (images, labels) in enumerate(val_dataset):
@@ -163,7 +167,7 @@ def main(_argv):
 
                 avg_val_loss.update_state(total_loss)
 
-                if batch % 10 == 0:
+                if batch % 20 == 0:
                     logging.info("{}_val_{}, {}, {}".format(epoch, batch, total_loss.numpy(), list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                 
 
@@ -171,17 +175,18 @@ def main(_argv):
             best_valid_loss = min(avg_val_loss.result(), best_valid_loss)
 
             logging.info('cur step: {}'.format(optimizer.iterations.numpy()))
-            logging.info('cur base learning rate: {}'.format(optimizer.lr.numpy()))
+            logging.info('cur base learning rate: {}'.format(optimizer.lr))
 
             logging.info("best: {}".format(is_best))
             logging.info("{}, train: {}, val: {}".format(epoch, avg_loss.result().numpy(), avg_val_loss.result().numpy()))
-            tf.summary.scalar('loss_valid', data=avg_loss.result().numpy(), step=loss_valid_step)
+            tf.summary.scalar('loss_valid', data=avg_val_loss.result(), step=loss_valid_step)
+            tf.summary.flush()
             loss_valid_step = loss_valid_step + 1
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
             model.save_weights('checkpoints/yolov3_face_train_finetune_{}.tf'.format(epoch))
-            model.save('checkpoints/latest')
+            model.save_weights('checkpoints/latest.tf')
 
             if is_best:
                 model.save_weights('checkpoints/model_best.tf')

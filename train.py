@@ -4,6 +4,8 @@ from absl.flags import FLAGS
 import tensorflow as tf
 import numpy as np
 import cv2
+import datetime
+
 from tensorflow.keras.callbacks import (
     ReduceLROnPlateau,
     EarlyStopping,
@@ -27,7 +29,7 @@ flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weight
                      'useful in transfer learning with different number of classes')
 
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('weights', './checkpoints/yolov3_face_train_transfer_16.tf',
+flags.DEFINE_string('weights', './checkpoints/yolov3-tiny.tf',
                     'path to weights file')
 flags.DEFINE_enum('mode', 'eager_tf', ['fit', 'eager_fit', 'eager_tf'],
                   'fit: model.fit, '
@@ -112,11 +114,21 @@ def main(_argv):
         # resume
         model = tf.keras.models.load_model('./checkpoints/latest')
 
+    lr = 0.001
+    step_patient = 0
+    def lr_schedule():
+        return lr
 
-
-    optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
+    optimizer = tf.keras.optimizers.Adam(lr_schedule)
     loss = [YoloLoss(anchors[mask]) for mask in anchor_masks]
     best_valid_loss = float('inf')
+
+    logdir = "logs/" + datetime.datetime.now().strftime("%Y.%m.%d_%H-%M-%S")
+    writer = tf.summary.create_file_writer(logdir)
+    writer.set_as_default()
+    loss_step = 0
+    loss_valid_step = 0
+
 
     if FLAGS.mode == 'eager_tf':
         avg_loss     = tf.keras.metrics.Mean('loss', dtype=tf.float32)
@@ -135,8 +147,11 @@ def main(_argv):
                 grads = tape.gradient(total_loss, model.trainable_variables)
                 optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-                logging.info("{}_train_{}, {}, {}".format(epoch, batch, total_loss.numpy(),list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                 avg_loss.update_state(total_loss)
+                if batch % 10 == 0:
+                    logging.info("{}_train_{}, {}, {}".format(epoch, batch, total_loss.numpy(),list(map(lambda x: np.sum(x.numpy()), pred_loss))))
+                    tf.summary.scalar('loss', data=total_loss, step=loss_step)
+                    loss_step = loss_step + 1
 
             for batch, (images, labels) in enumerate(val_dataset):
                 outputs = model(images)
@@ -146,14 +161,22 @@ def main(_argv):
                     pred_loss.append(loss_fn(label, output))
                 total_loss = tf.reduce_sum(pred_loss) + regularization_loss
 
-                logging.info("{}_val_{}, {}, {}".format(epoch, batch, total_loss.numpy(), list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                 avg_val_loss.update_state(total_loss)
 
+                if batch % 10 == 0:
+                    logging.info("{}_val_{}, {}, {}".format(epoch, batch, total_loss.numpy(), list(map(lambda x: np.sum(x.numpy()), pred_loss))))
+                
+
             is_best = avg_val_loss.result().numpy() < best_valid_loss
-            best_valid_loss = min(avg_val_loss.result().numpy(), best_valid_loss)
+            best_valid_loss = min(avg_val_loss.result(), best_valid_loss)
+
+            logging.info('cur step: {}'.format(optimizer.iterations.numpy()))
+            logging.info('cur base learning rate: {}'.format(optimizer.lr.numpy()))
 
             logging.info("best: {}".format(is_best))
             logging.info("{}, train: {}, val: {}".format(epoch, avg_loss.result().numpy(), avg_val_loss.result().numpy()))
+            tf.summary.scalar('loss_valid', data=avg_loss.result().numpy(), step=loss_valid_step)
+            loss_valid_step = loss_valid_step + 1
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
@@ -162,6 +185,19 @@ def main(_argv):
 
             if is_best:
                 model.save_weights('checkpoints/model_best.tf')
+                step_patient = 0
+            else:
+                step_patient = step_patient + 1
+                logging.info('patient step: {}'.format(step_patient))
+
+            if step_patient > 5:
+                lr = 0.1 * lr
+                logging.info('reduce learning rate until {}'.format(lr))
+
+            if step_patient > 15:
+                logging.info('exit learning loop by stopping')
+                break
+
 
 
     else:

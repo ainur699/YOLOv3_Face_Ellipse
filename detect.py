@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 from models import (
-    YoloV3, YoloV3Tiny, YoloV3Face
+    YoloV3Face, YoloV3FaceTiny
 )
 import dataset
 import os
@@ -27,7 +27,7 @@ def main(_argv):
     if len(physical_devices) > 0: tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
 
-    yolo = YoloV3Face(FLAGS.size)
+    yolo = YoloV3FaceTiny(FLAGS.size)
     yolo.load_weights(FLAGS.weights).expect_partial()
     logging.info('weights loaded')
 

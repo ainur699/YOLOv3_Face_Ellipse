@@ -13,9 +13,9 @@ from tensorflow.keras.callbacks import (
     TensorBoard
 )
 from models import (
-    YoloV3, YoloV3Tiny, YoloV3Face, YoloLoss,
-    yolo_anchors, yolo_anchor_masks,
-    yolo_tiny_anchors, yolo_tiny_anchor_masks,
+    YoloV3, YoloV3Tiny,
+    YoloV3Face, YoloV3FaceTiny, YoloLoss,
+    yolo_face_anchors, yolo_face_anchor_masks,
     yolo_face_tiny_anchors, yolo_face_tiny_anchor_masks
 )
 from utils import freeze_all
@@ -27,10 +27,12 @@ flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
 flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
 flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weights` file if different, '
                      'useful in transfer learning with different number of classes')
+flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
 
-flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('weights', './checkpoints/yolov3-tiny.tf',
-                    'path to weights file')
+
+flags.DEFINE_boolean('tiny', False, 'yolov3 or yolov3-tiny')
+flags.DEFINE_string('weights', './checkpoints/yolov3.tf', 
+                    'path to weights file') # './checkpoints/yolov3-tiny.tf'
 flags.DEFINE_enum('mode', 'eager_tf', ['fit', 'eager_fit', 'eager_tf'],
                   'fit: model.fit, '
                   'eager_fit: model.fit(run_eagerly=True), '
@@ -46,8 +48,6 @@ flags.DEFINE_enum('transfer', 'darknet',
 flags.DEFINE_integer('size', 512, 'image size')
 flags.DEFINE_integer('epochs', 500, 'number of epochs')
 flags.DEFINE_integer('batch_size', 8, 'batch size')
-flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
-
 
 
 def main(_argv):
@@ -55,14 +55,20 @@ def main(_argv):
     if len(physical_devices) > 0: tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
     # Model
-    model = YoloV3Face(FLAGS.size, training=True)
-    anchors = yolo_face_tiny_anchors
-    anchor_masks = yolo_face_tiny_anchor_masks
+    if FLAGS.tiny:
+        model = YoloV3FaceTiny(FLAGS.size, training=True)
+        anchors = yolo_face_tiny_anchors
+        anchor_masks = yolo_face_tiny_anchor_masks
+    else:
+        model = YoloV3Face(FLAGS.size, training=True)
+        anchors = yolo_face_anchors
+        anchor_masks = yolo_face_anchor_masks
+
   
     # Dataset
     train_dataset = dataset.CreateFDDB([('dataset/fddb/FDDB_train.txt', 'dataset/fddb/images'), ('dataset/300w/300w_train.txt', 'dataset/300w/images')], True) 
     val_dataset   = dataset.CreateFDDB([('dataset/300w/300w_valid.txt','dataset/300w/images')], False)
-    
+
     #for i, data in enumerate(train_dataset.take(10)):
     #    dataset.DrawExample(data, 'log_' + str(i) + '.png')
 
@@ -86,7 +92,7 @@ def main(_argv):
         if FLAGS.tiny:
             model_pretrained = YoloV3Tiny(FLAGS.size, training=True)
         else:
-            model_pretrained = YoloV3(FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+            model_pretrained = YoloV3(FLAGS.size, training=True)
 
         model_pretrained.load_weights(FLAGS.weights)
 
@@ -183,7 +189,7 @@ def main(_argv):
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
-            model.save_weights('checkpoints/yolov3_face_train_finetune_{}.tf'.format(epoch))
+            model.save_weights('checkpoints/train_{}.tf'.format(epoch))
             model.save_weights('checkpoints/latest.tf')
 
             if is_best:
@@ -210,7 +216,7 @@ def main(_argv):
         callbacks = [
             ReduceLROnPlateau(factor=0.3, patience=6, verbose=1),
             EarlyStopping(patience=15, verbose=1),
-            ModelCheckpoint('checkpoints/yolov3_face_train_finetune_{epoch}.tf', verbose=1, save_weights_only=True),
+            ModelCheckpoint('checkpoints/train_{epoch}.tf', verbose=1, save_weights_only=True),
             TensorBoard(log_dir='logs')
         ]
 

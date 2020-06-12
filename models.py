@@ -36,8 +36,13 @@ yolo_anchor_masks = np.array([[6, 7, 8], [3, 4, 5], [0, 1, 2]])
 yolo_tiny_anchors = np.array([(10, 14), (23, 27), (37, 58), (81, 82), (135, 169),  (344, 319)], np.float32) / 416
 yolo_tiny_anchor_masks = np.array([[3, 4, 5], [0, 1, 2]])
 
-yolo_face_anchors = np.array([(0.33, 0.5), (0.5, 0.75)], np.float32)
-yolo_face_anchor_masks = np.array([[1], [0]])
+
+yolo_anchors = np.array([(0.025, 0.032), (0.039, 0.073), (0.08, 0.08), (0.073, 0.15), (0.15, 0.11), (0.15, 0.29), (0.28, 0.22), (0.375, 0.48), (0.9, 0.79)], np.float32) / 416
+yolo_anchor_masks = np.array([[6, 7, 8], [3, 4, 5], [0, 1, 2]])
+
+
+yolo_face_tiny_anchors = np.array([(0.33, 0.5), (0.5, 0.75)], np.float32) #разделить на два
+yolo_face_tiny_anchor_masks = np.array([[1], [0]])
 
 
 def DarknetConv(x, filters, size, strides=1, batch_norm=True):
@@ -280,7 +285,7 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
     return Model(inputs, outputs, name='yolov3_tiny')
 
 
-def YoloV3Face(size=None, channels=3, anchors=yolo_face_anchors, masks=yolo_face_anchor_masks, training=False):
+def YoloV3Face(size=None, channels=3, anchors=yolo_face_tiny_anchors, masks=yolo_face_tiny_anchor_masks, training=False):
     x = inputs = Input([size, size, channels], name='input')
 
     x_8, x = DarknetTiny(name='yolo_darknet')(x)

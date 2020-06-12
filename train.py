@@ -16,7 +16,7 @@ from models import (
     YoloV3, YoloV3Tiny, YoloV3Face, YoloLoss,
     yolo_anchors, yolo_anchor_masks,
     yolo_tiny_anchors, yolo_tiny_anchor_masks,
-    yolo_face_anchors, yolo_face_anchor_masks
+    yolo_face_tiny_anchors, yolo_face_tiny_anchor_masks
 )
 from utils import freeze_all
 import dataset
@@ -56,8 +56,8 @@ def main(_argv):
 
     # Model
     model = YoloV3Face(FLAGS.size, training=True)
-    anchors = yolo_face_anchors
-    anchor_masks = yolo_face_anchor_masks
+    anchors = yolo_face_tiny_anchors
+    anchor_masks = yolo_face_tiny_anchor_masks
   
     # Dataset
     train_dataset = dataset.CreateFDDB([('dataset/fddb/FDDB_train.txt', 'dataset/fddb/images'), ('dataset/300w/300w_train.txt', 'dataset/300w/images')], True) 

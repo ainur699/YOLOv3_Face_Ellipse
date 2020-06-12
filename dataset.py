@@ -236,10 +236,7 @@ def DrawOutputs(img, outputs, name):
 
         center_coordinates = (int(xywh[0]), int(xywh[1]))
         axesLength = (int(xywh[2]), int(xywh[3]))
-
-        angle = ell[4]
-        angle = int(180.0 / 3.1416 * angle)
-        angle = angle - 90 if angle >= 0 else angle + 90 
+        angle = int(180.0 / 3.1416 * ell[4])
 
         cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
     

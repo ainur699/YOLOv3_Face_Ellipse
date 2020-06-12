@@ -107,24 +107,22 @@ def main(_argv):
             # freeze darknet and fine tune other layers
             darknet = model.get_layer('yolo_darknet')
             freeze_all(darknet)
-        elif FLAGS.transfer == 'frozen':
+        elif FLAGS.transfer == 'frozen': 
             # freeze everything
             freeze_all(model)
     else:
         # resume
-        model.load_weights('checkpoints/latest.tf')
-
-    model.save_weights('checkpoints/latest.tf')
+        model.load_weights('checkpoints/model_best.tf')
 
 
-    lr = 0.001
+    lr = 1e-3
     step_patient = 0
     def lr_schedule():
         return lr
 
     optimizer = tf.keras.optimizers.Adam(lr_schedule)
     loss = [YoloLoss(anchors[mask]) for mask in anchor_masks]
-    best_valid_loss = float('inf')
+    best_valid_loss =  float('inf')
 
     logdir = "logs/" + datetime.datetime.now().strftime("%Y.%m.%d_%H-%M-%S")
     writer = tf.summary.create_file_writer(logdir)
@@ -195,8 +193,9 @@ def main(_argv):
                 step_patient = step_patient + 1
                 logging.info('patient step: {}'.format(step_patient))
 
-            if step_patient > 5:
+            if step_patient >= 4:
                 lr = 0.1 * lr
+                step_patient = 0
                 logging.info('reduce learning rate until {}'.format(lr))
 
             if step_patient > 15:

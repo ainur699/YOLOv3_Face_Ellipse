@@ -12,13 +12,14 @@ import os
 import glob
 
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
-flags.DEFINE_string('weights', './checkpoints/yolov3_face_train_finetune_25.tf', 'path to weights file')
-flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_integer('size', 512, 'resize images to')
 flags.DEFINE_string('image', 'D:/Images/04ed1c2ebffb11e38f8c0002c9dced72_6.jpg', 'path to input image')
 flags.DEFINE_string('tfrecord', None, 'tfrecord instead of image')
 flags.DEFINE_string('output', './output.png', 'path to output image')
 flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
+
+flags.DEFINE_string('weights', './checkpoints/model_best.tf', 'path to weights file')
+flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
+flags.DEFINE_integer('size', 512, 'resize images to')
 
 
 def main(_argv):
@@ -31,10 +32,10 @@ def main(_argv):
     logging.info('weights loaded')
 
     if 1:
-        image_dir = 'D:/Images/'
+        image_dir = 'D:/Datasets/IBUG/Test/01_Indoor/'
 
         for filename in os.listdir(image_dir):
-            if filename.endswith(".jpg"):
+            if filename.endswith(".jpg") or filename.endswith(".png"):
                 img, _, _ = dataset.load_and_preprocess_image(image_dir + filename)
                 img = tf.expand_dims(img, 0)
         
@@ -43,7 +44,7 @@ def main(_argv):
                 t2 = time.time()
                 logging.info('time: {}'.format(t2 - t1))
         
-                dataset.DrawOutputs(img[0], outputs[0], './results/' + filename)
+                dataset.DrawOutputs(img[0], outputs[0], 'C:/Users/zirga/Desktop/yolo_result/' + filename)
     else:
         root_path = 'D:/Datasets/FDDB'
         label_files = glob.glob(os.path.join(root_path, 'FDDB-folds\\FDDB-fold-*-ellipseList.txt'))

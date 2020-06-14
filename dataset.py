@@ -227,20 +227,55 @@ def DrawOutputs(img, outputs, name):
     im = 255 * img.numpy()
     im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
 
+
     ellipses = outputs.numpy()
 
-    for ell in ellipses:
-        if ell[2] == 0:
-            continue
-        xywh = FLAGS.size * ell[0:4]
+    if True:
+        for ell in ellipses:
+            if ell[2] == 0:
+                continue
+            xywh = FLAGS.size * ell[0:4]
+        
+            center_coordinates = (int(xywh[0]), int(xywh[1]))
+            axesLength = (int(xywh[2]), int(xywh[3]))
+            angle = int(180.0 / 3.1416 * ell[4])
+        
+            cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
+        
+        cv2.imwrite(name, im)
+    else:
+        if len(ellipses) != 0 and ellipses[0][2] != 0:
+            ell = ellipses[0]
 
-        center_coordinates = (int(xywh[0]), int(xywh[1]))
-        axesLength = (int(xywh[2]), int(xywh[3]))
-        angle = int(180.0 / 3.1416 * ell[4])
+            xywh = FLAGS.size * ell[0:4]
 
-        cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
-    
-    cv2.imwrite(name, im)
+            center = np.array([xywh[0], xywh[1]])
+            axes = np.array([xywh[2], xywh[3]])
+            angle = ell[4]
+
+            top    = np.array([center[0] + np.sin(angle) * axes[1], center[1] - np.cos(angle) * axes[1]])
+            bottom = np.array([center[0] - np.sin(angle) * axes[1], center[1] + np.cos(angle) * axes[1]])
+            quartet_top = bottom + 0.75 * (top - bottom)
+            length = np.linalg.norm(quartet_top - bottom)
+
+            dir = np.array([np.cos(angle), np.sin(angle)])
+            bbox_tl = quartet_top - 0.5 * length * dir
+            bbox_tr = quartet_top + 0.5 * length * dir
+            bbox_br = bottom + 0.5 * length * dir
+
+            scale = 1.25
+            bbox_center = 0.5 * (bbox_tl + bbox_br)
+            bbox_tl = bbox_center + scale * (bbox_tl - bbox_center)
+            bbox_tr = bbox_center + scale * (bbox_tr - bbox_center)
+            bbox_br = bbox_center + scale * (bbox_br - bbox_center)
+
+            src = np.float32([bbox_tl, bbox_tr, bbox_br])
+            dst = np.float32([[0,0], [511, 0], [511, 511]])
+
+            trf = cv2.getAffineTransform(src, dst)
+            im = cv2.warpAffine(im, trf, (512, 512))
+
+            cv2.imwrite(name, im)
 
 
 ## https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/using_your_own_dataset.md#conversion-script-outline-conversion-script-outline

@@ -40,6 +40,8 @@ yolo_tiny_anchor_masks = np.array([[3, 4, 5], [0, 1, 2]])
 yolo_face_anchors = np.array([(0.063, 0.091), (0.125, 0.183), (0.171, 0.250), (0.213, 0.311), (0.267, 0.380), (0.316, 0.463)], np.float32)
 yolo_face_anchor_masks = np.array([[4, 5], [2, 3], [0, 1]])
 
+#yolo_face_tiny_anchors = np.array([(0.33, 0.5), (0.5, 0.75)], np.float32)
+#yolo_face_tiny_anchor_masks = np.array([[1], [0]])
 yolo_face_tiny_anchors = np.array([(0.063, 0.091), (0.125, 0.183), (0.171, 0.250), (0.213, 0.311), (0.267, 0.380), (0.316, 0.463)], np.float32)
 yolo_face_tiny_anchor_masks = np.array([[3, 4, 5], [0, 1, 2]])
 

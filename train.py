@@ -30,14 +30,16 @@ flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weight
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
 
 
-flags.DEFINE_boolean('tiny', False, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('weights', './checkpoints/yolov3.tf', 
-                    'path to weights file') # './checkpoints/yolov3-tiny.tf'
+flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
+flags.DEFINE_string('weights', './checkpoints/yolov3-tiny.tf', 
+                    'path to weights file'
+                    './checkpoints/yolov3-tiny.tf'
+                    './checkpoints/yolov3.tf')
 flags.DEFINE_enum('mode', 'eager_tf', ['fit', 'eager_fit', 'eager_tf'],
                   'fit: model.fit, '
                   'eager_fit: model.fit(run_eagerly=True), '
                   'eager_tf: custom GradientTape')
-flags.DEFINE_enum('transfer', 'darknet',
+flags.DEFINE_enum('transfer', 'resume',
                   ['none', 'darknet', 'no_output', 'frozen', 'fine_tune', 'resume'],
                   'none: Training from scratch, '
                   'darknet: Transfer darknet, '
@@ -73,11 +75,11 @@ def main(_argv):
     #    dataset.DrawExample(data, 'log_' + str(i) + '.png')
 
     train_dataset = train_dataset.shuffle(512)
-    train_dataset = train_dataset.batch(8)
+    train_dataset = train_dataset.batch(FLAGS.batch_size)
     train_dataset = train_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))
     train_dataset = train_dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-    val_dataset = val_dataset.batch(8)
+    val_dataset = val_dataset.batch(FLAGS.batch_size)
     val_dataset = val_dataset.map(lambda x, y: (x, dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))
 
 
@@ -118,7 +120,9 @@ def main(_argv):
             freeze_all(model)
     else:
         # resume
-        model.load_weights('checkpoints/model_best.tf')
+        #model.load_weights('checkpoints/model_best.tf')
+        model.load_weights('checkpoints/train_34.tf')
+        #freeze_all(model.get_layer('yolo_darknet'))
 
 
     lr = 1e-3
@@ -128,7 +132,7 @@ def main(_argv):
 
     optimizer = tf.keras.optimizers.Adam(lr_schedule)
     loss = [YoloLoss(anchors[mask]) for mask in anchor_masks]
-    best_valid_loss =  float('inf')
+    best_valid_loss = float('inf')
 
     logdir = "logs/" + datetime.datetime.now().strftime("%Y.%m.%d_%H-%M-%S")
     writer = tf.summary.create_file_writer(logdir)
@@ -206,6 +210,9 @@ def main(_argv):
 
             if step_patient > 15:
                 logging.info('exit learning loop by stopping')
+                break
+
+            if lr <= 1e-8:
                 break
 
 

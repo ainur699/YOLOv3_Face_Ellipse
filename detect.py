@@ -26,56 +26,27 @@ def main(_argv):
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0: tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-
-    yolo = YoloV3FaceTiny(FLAGS.size)
-    yolo.load_weights(FLAGS.weights).expect_partial()
-    logging.info('weights loaded')
-
-    if 1:
-        image_dir = 'D:/Datasets/IBUG/Test/01_Indoor/'
-
-        for filename in os.listdir(image_dir):
-            if filename.endswith(".jpg") or filename.endswith(".png"):
-                img, _, _ = dataset.load_and_preprocess_image(image_dir + filename)
-                img = tf.expand_dims(img, 0)
-        
-                t1 = time.time()
-                outputs = yolo(img)
-                t2 = time.time()
-                logging.info('time: {}'.format(t2 - t1))
-        
-                dataset.DrawOutputs(img[0], outputs[0], 'C:/Users/zirga/Desktop/yolo_result/' + filename)
+    if FLAGS.tiny:
+        yolo = YoloV3FaceTiny(FLAGS.size)
     else:
-        root_path = 'D:/Datasets/FDDB'
-        label_files = glob.glob(os.path.join(root_path, 'FDDB-folds\\FDDB-fold-*-ellipseList.txt'))
+        yolo = YoloV3Face(FLAGS.size)
 
-        img_num = 0
+    yolo.load_weights(FLAGS.weights).expect_partial()
 
-        for fname in label_files:
-            if img_num > 100: break
-            with open(fname) as f:
-                raw_label = f.read().strip().split('\n')
-                
-                id = 0
-                
-                while id < len(raw_label):
-                    image_name = os.path.join(root_path, 'originalPics', raw_label[id]) + '.jpg'
-                    image_name = os.path.normpath(image_name)
-                    ell_num = int(raw_label[id + 1])
-                    id += 2
-                    
-                    ellipses = []
-                    for i in range(ell_num):
-                        ell = tuple(map(float, raw_label[id+i].split(' ')[:-2]))
-                        ellipses.append(ell)
-                    
-                    id += ell_num
-                    
-                    img, _, _ = dataset.load_and_preprocess_image(image_name)
-                    img = tf.expand_dims(img, 0)
-                    outputs = yolo(img)
-                    img_num = 1 + img_num
-                    dataset.DrawOutputs(img[0], outputs[0], './results/' + os.path.basename(image_name))
+    image_dir = 'D:/Datasets/IBUG/Test/01_Indoor/'
+
+    for filename in os.listdir(image_dir):
+        if filename.endswith(".jpg") or filename.endswith(".png"):
+            img, _, _ = dataset.load_and_preprocess_image(image_dir + filename)
+            img = tf.expand_dims(img, 0)
+    
+            t1 = time.time()
+            outputs = yolo(img)
+            t2 = time.time()
+            logging.info('time: {}'.format(t2 - t1))
+    
+            dataset.DrawOutputs(img[0], outputs[0], 'D:/results/yolo_result/' + filename)
+
 
 
 if __name__ == '__main__':

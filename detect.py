@@ -37,15 +37,15 @@ def main(_argv):
 
     for filename in os.listdir(image_dir):
         if filename.endswith(".jpg") or filename.endswith(".png"):
-            img, _, _ = dataset.load_and_preprocess_image(image_dir + filename)
+            img, pad, max_shape = dataset.load_and_preprocess_image(image_dir + filename)
             img = tf.expand_dims(img, 0)
     
             t1 = time.time()
             outputs = yolo(img)
             t2 = time.time()
             logging.info('time: {}'.format(t2 - t1))
-    
-            dataset.DrawOutputs(img[0], outputs[0], 'D:/results/yolo_result/' + filename)
+
+            dataset.DrawOutputs(img[0], outputs[0], filename, (pad[0].numpy(), pad[1].numpy()), max_shape.numpy())
 
 
 

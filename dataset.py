@@ -223,14 +223,16 @@ def DrawExample(example, name):
     cv2.imwrite(name, image)
 
 
-def DrawOutputs(img, outputs, name):
+def DrawOutputs(img, outputs, name, pad, max_shape):
     im = 255 * img.numpy()
     im = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
 
 
     ellipses = outputs.numpy()
 
-    if True:
+    f = open('D:/results/yolo_result/yolo_tiny_predictions/' + name + '.txt', 'w')
+
+    if False:
         for ell in ellipses:
             if ell[2] == 0:
                 continue
@@ -247,10 +249,11 @@ def DrawOutputs(img, outputs, name):
         if len(ellipses) != 0 and ellipses[0][2] != 0:
             ell = ellipses[0]
 
-            xywh = FLAGS.size * ell[0:4]
+            xy = max_shape * ell[0:2] - pad
+            wh = max_shape * ell[2:4]
 
-            center = np.array([xywh[0], xywh[1]])
-            axes = np.array([xywh[2], xywh[3]])
+            center = np.array([xy[0], xy[1]])
+            axes = np.array([wh[0], wh[1]])
             angle = ell[4]
 
             top    = np.array([center[0] + np.sin(angle) * axes[1], center[1] - np.cos(angle) * axes[1]])
@@ -269,13 +272,22 @@ def DrawOutputs(img, outputs, name):
             bbox_tr = bbox_center + scale * (bbox_tr - bbox_center)
             bbox_br = bbox_center + scale * (bbox_br - bbox_center)
 
-            src = np.float32([bbox_tl, bbox_tr, bbox_br])
-            dst = np.float32([[0,0], [511, 0], [511, 511]])
+            #src = np.float32([bbox_tl, bbox_tr, bbox_br])
+            #dst = np.float32([[0,0], [511, 0], [511, 511]])
+            #
+            #trf = cv2.getAffineTransform(src, dst)
+            #im = cv2.warpAffine(im, trf, (512, 512))
+            #
+            #cv2.imwrite('D:/results/yolo_result/yolo_tiny_crop/' + name, im)
+            
+            f.write(str(bbox_tl[0]) + ',')
+            f.write(str(bbox_tl[1]) + ',')
+            f.write(str(bbox_tr[0]) + ',')
+            f.write(str(bbox_tr[1]) + ',')
+            f.write(str(bbox_br[0]) + ',')
+            f.write(str(bbox_br[1]) + '\n')
 
-            trf = cv2.getAffineTransform(src, dst)
-            im = cv2.warpAffine(im, trf, (512, 512))
-
-            cv2.imwrite(name, im)
+    f.close()
 
 
 ## https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/using_your_own_dataset.md#conversion-script-outline-conversion-script-outline

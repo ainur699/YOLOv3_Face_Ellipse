@@ -33,10 +33,11 @@ def main(_argv):
 
     yolo.load_weights(FLAGS.weights).expect_partial()
 
-    image_dir = 'D:/Datasets/IBUG/Test/01_Indoor/'
+    #image_dir = 'D:/Datasets/IBUG/Test/01_Indoor/'
+    image_dir = 'D:/PhotolabImages/good-data/'
 
     for filename in os.listdir(image_dir):
-        if filename.endswith(".jpg") or filename.endswith(".png"):
+        if filename.endswith(".jpg") or filename.endswith(".png") or filename.endswith(".jpeg"):
             img, pad, max_shape = dataset.load_and_preprocess_image(image_dir + filename)
             img = tf.expand_dims(img, 0)
     

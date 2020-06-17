@@ -230,8 +230,6 @@ def DrawOutputs(img, outputs, name, pad, max_shape):
 
     ellipses = outputs.numpy()
 
-    f = open('D:/results/yolo_result/yolo_tiny_predictions/' + name + '.txt', 'w')
-
     if False:
         for ell in ellipses:
             if ell[2] == 0:
@@ -244,8 +242,11 @@ def DrawOutputs(img, outputs, name, pad, max_shape):
         
             cv2.ellipse(im, center_coordinates, axesLength, angle, 0, 360, (0,255,0), 1)
         
-        cv2.imwrite(name, im)
+        cv2.imwrite('D:/PhotolabImages/good-data_ellipses/' + name, im)
     else:
+        #f = open('D:/results/yolo_result/yolo_tiny_predictions/' + name + '.txt', 'w')
+        f = open('D:/PhotolabImages/good-data_ellipses/' + name + '.txt', 'w')
+
         if len(ellipses) != 0 and ellipses[0][2] != 0:
             ell = ellipses[0]
 
@@ -278,7 +279,7 @@ def DrawOutputs(img, outputs, name, pad, max_shape):
             #trf = cv2.getAffineTransform(src, dst)
             #im = cv2.warpAffine(im, trf, (512, 512))
             #
-            #cv2.imwrite('D:/results/yolo_result/yolo_tiny_crop/' + name, im)
+            #cv2.imwrite('D:/PhotolabImages/good-data_ellipses/' + name, im)
             
             f.write(str(bbox_tl[0]) + ',')
             f.write(str(bbox_tl[1]) + ',')
@@ -286,8 +287,7 @@ def DrawOutputs(img, outputs, name, pad, max_shape):
             f.write(str(bbox_tr[1]) + ',')
             f.write(str(bbox_br[0]) + ',')
             f.write(str(bbox_br[1]) + '\n')
-
-    f.close()
+        f.close()
 
 
 ## https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/using_your_own_dataset.md#conversion-script-outline-conversion-script-outline

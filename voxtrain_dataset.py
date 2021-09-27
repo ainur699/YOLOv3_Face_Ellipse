@@ -56,6 +56,8 @@ class VideoDataset(data.Dataset):
         if not ret:
             raise Exception('None Image')
 
-        frame = frame[..., ::-1] / 255
-        
-        return frame
+        data = {}
+        data['frame'] = frame[..., ::-1] / 255
+        data['id'] = idx
+
+        return data

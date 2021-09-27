@@ -10,6 +10,7 @@ from models import (
 import dataset
 import os
 import glob
+from tqdm import tqdm
 
 flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
 flags.DEFINE_string('image', 'D:/Images/04ed1c2ebffb11e38f8c0002c9dced72_6.jpg', 'path to input image')
@@ -33,21 +34,18 @@ def main(_argv):
 
     yolo.load_weights(FLAGS.weights).expect_partial()
 
-    #image_dir = 'D:/Datasets/IBUG/Test/01_Indoor/'
-    image_dir = 'D:/PhotolabImages/good-data/'
+    filenames = glob.glob('D:/test_images/imgs/*.jpg')
 
-    for filename in os.listdir(image_dir):
-        if filename.endswith(".jpg") or filename.endswith(".png") or filename.endswith(".jpeg"):
-            img, pad, max_shape = dataset.load_and_preprocess_image(image_dir + filename)
-            img = tf.expand_dims(img, 0)
-    
-            t1 = time.time()
-            outputs = yolo(img)
-            t2 = time.time()
-            logging.info('time: {}'.format(t2 - t1))
+    for filename in tqdm(filenames):
+        img, pad, max_shape = dataset.load_and_preprocess_image(filename)
+        img = tf.expand_dims(img, 0)
+        
+        t1 = time.time()
+        outputs = yolo(img)
+        t2 = time.time()
+        logging.info('time: {}'.format(t2 - t1))
 
-            dataset.DrawOutputs(img[0], outputs[0], filename, (pad[0].numpy(), pad[1].numpy()), max_shape.numpy())
-
+        dataset.DrawOutputs(img[0], outputs[0], filename, (pad[0].numpy(), pad[1].numpy()), max_shape.numpy())
 
 
 if __name__ == '__main__':

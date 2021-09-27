@@ -39,3 +39,23 @@ class VoxCelebDataset(data.Dataset):
         out['image'] = image
         out['path'] = os.path.join(*os.path.normpath(self.videos[idx]).split(os.sep)[-2:])
         return out
+
+
+class VideoDataset(data.Dataset):
+
+    def __init__(self, video_path):
+        self.capture = cv2.VideoCapture(video_path)        
+        self.len = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, idx):
+        self.capture.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = self.capture.read()
+        if not ret:
+            raise Exception('None Image')
+
+        frame = frame[..., ::-1] / 255
+        
+        return frame

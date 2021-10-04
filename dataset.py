@@ -244,7 +244,7 @@ def DrawOutputs(img, outputs, name, pad, max_shape):
         
         cv2.imwrite('D:/PhotolabImages/good-data_ellipses/' + name, im)
     else:
-        f = open(name.replace('imgs', 'bbox').replace('.jpg', '.txt'), 'w')
+        f = open(name.replace('imgs', 'bbox').replace('.jpg', '.txt').replace('.png', '.txt').replace('.jpeg', '.txt'), 'w')
 
         if len(ellipses) != 0 and ellipses[0][2] != 0:
             ell = ellipses[0]

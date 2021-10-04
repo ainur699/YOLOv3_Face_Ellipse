@@ -34,7 +34,7 @@ def main(_argv):
 
     yolo.load_weights(FLAGS.weights).expect_partial()
 
-    filenames = glob.glob('D:/test_images/imgs/*.jpg')
+    filenames = glob.glob('D:/photolab_test/imgs/*')
 
     for filename in tqdm(filenames):
         img, pad, max_shape = dataset.load_and_preprocess_image(filename)
